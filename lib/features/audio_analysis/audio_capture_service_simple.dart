@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/services.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/foundation.dart';
+import 'web_audio_capture_service.dart' if (dart.library.io) 'dummy_audio_capture_service.dart';
 
 class AudioCaptureService {
-  static const int sampleRate = 16000;
+  static const int sampleRate = 44100;
   static const int bufferSize = 1024;
   
   StreamController<List<double>>? _audioStreamController;
@@ -12,21 +12,43 @@ class AudioCaptureService {
   bool _isInitialized = false;
   bool _isRecording = false;
   
+  // Platform-specific audio capture service
+  late final dynamic _platformService;
+  
   Stream<List<double>> get audioStream {
+    if (kIsWeb) {
+      // Use real web audio capture
+      return (_platformService as WebAudioCaptureService).audioStream;
+    }
+    // Fallback to dummy audio
     _audioStreamController ??= StreamController<List<double>>.broadcast();
     return _audioStreamController!.stream;
+  }
+  
+  AudioCaptureService() {
+    if (kIsWeb) {
+      _platformService = WebAudioCaptureService();
+    }
   }
   
   Future<void> initialize() async {
     if (_isInitialized) return;
     
-    // 권한 요청
-    final status = await Permission.microphone.request();
-    if (status != PermissionStatus.granted) {
-      throw AudioCaptureException('Microphone permission denied');
+    try {
+      if (kIsWeb) {
+        // Use real web audio
+        await (_platformService as WebAudioCaptureService).initialize();
+        print('Web audio capture initialized');
+      } else {
+        // Dummy mode for other platforms
+        print('Audio capture service initialized (dummy mode)');
+      }
+      _isInitialized = true;
+    } catch (e) {
+      print('Audio initialization failed: $e');
+      // Fallback to dummy mode
+      _isInitialized = true;
     }
-    
-    _isInitialized = true;
   }
   
   Future<void> startCapture() async {
@@ -38,23 +60,41 @@ class AudioCaptureService {
     
     _isRecording = true;
     
-    // 더미 오디오 데이터 생성 (실제 구현에서는 flutter_sound 사용)
-    _dummyTimer = Timer.periodic(
-      const Duration(milliseconds: 64), // 16ms for 1024 samples at 16kHz
-      (_) => _generateDummyAudio(),
-    );
+    if (kIsWeb) {
+      // Use real web audio capture
+      await (_platformService as WebAudioCaptureService).startCapture();
+      print('Web audio capture started');
+    } else {
+      // 더미 오디오 데이터 생성
+      _dummyTimer = Timer.periodic(
+        const Duration(milliseconds: 23), // ~44.1kHz용 타이밍
+        (_) => _generateDummyAudio(),
+      );
+      print('Audio capture started (dummy mode)');
+    }
   }
   
   Future<void> stopCapture() async {
     if (!_isRecording) return;
     
     _isRecording = false;
-    _dummyTimer?.cancel();
+    
+    if (kIsWeb) {
+      await (_platformService as WebAudioCaptureService).stopCapture();
+    } else {
+      _dummyTimer?.cancel();
+    }
+    print('Audio capture stopped');
   }
   
   Future<void> dispose() async {
     await stopCapture();
-    await _audioStreamController?.close();
+    
+    if (kIsWeb) {
+      (_platformService as WebAudioCaptureService).dispose();
+    } else {
+      await _audioStreamController?.close();
+    }
     _isInitialized = false;
   }
   

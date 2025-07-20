@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AI 보컬 트레이너 - 실행 가이드</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .step { background: #f5f5f5; padding: 20px; margin: 10px 0; border-radius: 5px; }
+        .url { background: #e8f4f8; padding: 10px; font-family: monospace; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>🎵 AI 보컬 트레이너 앱 실행 가이드</h1>
+    
+    <div class="step">
+        <h2>방법 1: 파일 직접 열기</h2>
+        <p>Finder에서 다음 파일을 더블클릭하세요:</p>
+        <div class="url">/Users/seoyeongbin/vocal_trainer_ai/build/web/index.html</div>
+    </div>
+    
+    <div class="step">
+        <h2>방법 2: 브라우저 주소창에 입력</h2>
+        <p>Chrome 브라우저를 열고 주소창에 복사하여 붙여넣기:</p>
+        <div class="url">file:///Users/seoyeongbin/vocal_trainer_ai/build/web/index.html</div>
+    </div>
+    
+    <div class="step">
+        <h2>앱 기능 확인 사항</h2>
+        <ul>
+            <li>✅ 3D 모델 로딩 (human_torso.glb, vocal_tract.glb, breathing_guide.glb)</li>
+            <li>✅ 오디오 시각화 패널</li>
+            <li>✅ 실시간 피치 분석</li>
+            <li>✅ AI 코칭 조언</li>
+            <li>⚠️ 마이크 녹음 (파일 프로토콜에서는 제한됨)</li>
+        </ul>
+    </div>
+    
+    <div class="step">
+        <h2>문제 해결</h2>
+        <p>파일이 열리지 않으면:</p>
+        <ol>
+            <li>VS Code 설치</li>
+            <li>Live Server 확장 설치</li>
+            <li>build/web 폴더를 VS Code에서 열기</li>
+            <li>index.html 우클릭 → "Open with Live Server"</li>
+        </ol>
+    </div>
+    
+    <p><strong>현재 상태:</strong> 3D 모델 파일들이 성공적으로 생성되어 앱에 포함되었습니다!</p>
+</body>
+</html>

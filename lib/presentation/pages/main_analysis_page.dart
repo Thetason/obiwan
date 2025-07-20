@@ -4,9 +4,12 @@ import '../widgets/audio_visualization_widget.dart';
 import '../widgets/visual_guide_widget.dart';
 import '../widgets/coaching_advice_widget.dart';
 import '../widgets/control_panel_widget.dart';
+import '../widgets/enhanced_pitch_visualization_widget.dart';
+import '../widgets/ai_coaching_panel.dart';
 import '../providers/audio_analysis_provider.dart';
 import '../providers/visual_guide_provider.dart';
 import '../../domain/entities/vocal_analysis.dart';
+import '../../core/theme/app_theme.dart';
 
 class MainAnalysisPage extends ConsumerStatefulWidget {
   const MainAnalysisPage({super.key});
@@ -15,9 +18,30 @@ class MainAnalysisPage extends ConsumerStatefulWidget {
   ConsumerState<MainAnalysisPage> createState() => _MainAnalysisPageState();
 }
 
-class _MainAnalysisPageState extends ConsumerState<MainAnalysisPage> {
+class _MainAnalysisPageState extends ConsumerState<MainAnalysisPage> 
+    with TickerProviderStateMixin {
   bool _isRecording = false;
   bool _showStepByStep = false;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,230 +49,320 @@ class _MainAnalysisPageState extends ConsumerState<MainAnalysisPage> {
     final visualGuideState = ref.watch(visualGuideProvider);
     
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
-        title: const Text(
-          'AI 보컬 코치',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: const Color(0xFF2D2D2D),
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: () {
-              // 설정 화면으로 이동
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // 상단: 실시간 파형 + 음정 곡선 (25% 높이)
-          Expanded(
-            flex: 1,
-            child: Container(
-              margin: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2D2D2D),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: AudioVisualizationWidget(
-                audioData: audioState.audioData,
-                pitchData: audioState.pitchData,
-                isRecording: _isRecording,
-              ),
-            ),
-          ),
-          
-          // 중앙: 3D 아바타/해부학 모델 (50% 높이)
-          Expanded(
-            flex: 2,
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 8.0),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2D2D2D),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  // 3D 모델 영역
-                  VisualGuideWidget(
-                    visualGuideState: visualGuideState,
-                    showStepByStep: _showStepByStep,
-                  ),
-                  
-                  // 로딩 오버레이
-                  if (visualGuideState.isLoading || audioState.isAnalyzing)
-                    Container(
-                      color: Colors.black.withOpacity(0.5),
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      ),
-                    ),
-                  
-                  // 상단 우측 컨트롤 버튼들
-                  Positioned(
-                    top: 16,
-                    right: 16,
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            _showStepByStep ? Icons.fullscreen_exit : Icons.fullscreen,
-                            color: Colors.white,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _showStepByStep = !_showStepByStep;
-                            });
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.refresh,
-                            color: Colors.white,
-                          ),
-                          onPressed: () {
-                            ref.read(visualGuideProvider.notifier).reset();
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // 하단: 조언 텍스트 + 액션 버튼 (25% 높이)
-          Expanded(
-            flex: 1,
-            child: Container(
-              margin: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2D2D2D),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: CoachingAdviceWidget(
-                analysis: audioState.analysis,
-                isRecording: _isRecording,
-                onAdviceAction: (action) {
-                  _handleAdviceAction(action);
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-      
-      // 하단 컨트롤 패널
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF2D2D2D),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: AppTheme.backgroundGradient,
         ),
         child: SafeArea(
-          child: ControlPanelWidget(
-            isRecording: _isRecording,
-            onRecordToggle: _toggleRecording,
-            onStepByStepToggle: () {
-              setState(() {
-                _showStepByStep = !_showStepByStep;
-              });
-            },
-            showStepByStep: _showStepByStep,
+          child: Column(
+            children: [
+              // Custom App Bar with glassmorphism effect
+              _buildCustomAppBar(context),
+              
+              // Main Content Area
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      // Left Column - Enhanced AI Audio Analysis
+                      Expanded(
+                        flex: 1,
+                        child: Column(
+                          children: [
+                            // Enhanced Pitch Visualization with AI
+                            Expanded(
+                              flex: 3,
+                              child: _buildEnhancedPitchVisualization(),
+                            ),
+                            const SizedBox(height: 16),
+                            // Control Panel
+                            Expanded(
+                              flex: 1,
+                              child: _buildControlPanel(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(width: 16),
+                      
+                      // Right Column - 3D Guide & AI Coaching
+                      Expanded(
+                        flex: 1,
+                        child: Column(
+                          children: [
+                            // 3D Visual Guide
+                            Expanded(
+                              flex: 2,
+                              child: _build3DGuidePanel(visualGuideState),
+                            ),
+                            const SizedBox(height: 16),
+                            // Enhanced AI Coaching Panel
+                            Expanded(
+                              flex: 2,
+                              child: _buildAICoachingPanel(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
         ),
       ),
     );
   }
 
-  void _toggleRecording() async {
-    setState(() {
-      _isRecording = !_isRecording;
-    });
-    
-    if (_isRecording) {
-      await ref.read(audioAnalysisProvider.notifier).startRecording();
-    } else {
-      await ref.read(audioAnalysisProvider.notifier).stopRecording();
-    }
+  Widget _buildCustomAppBar(BuildContext context) {
+    return Container(
+      height: 80,
+      margin: const EdgeInsets.all(16),
+      decoration: AppTheme.glassmorphismDecoration,
+      child: Row(
+        children: [
+          const SizedBox(width: 20),
+          AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _isRecording ? _pulseAnimation.value : 1.0,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: _isRecording 
+                        ? AppTheme.accentGradient 
+                        : AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: _isRecording ? [
+                      BoxShadow(
+                        color: AppTheme.accentColor.withOpacity(0.5),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                    ] : [],
+                  ),
+                  child: const Icon(
+                    Icons.mic,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AI 보컬 트레이너',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Consumer(
+                  builder: (context, ref, child) {
+                    final emotion = ref.watch(emotionProvider);
+                    final style = ref.watch(styleProvider);
+                    final currentNote = ref.watch(currentNoteProvider);
+                    
+                    String statusText = _isRecording 
+                        ? '🎵 분석 중...' 
+                        : '실시간 AI 음성 분석 및 코칭';
+                    
+                    if (_isRecording && currentNote.isNotEmpty) {
+                      statusText = '🎵 $currentNote | $emotion | $style';
+                    }
+                    
+                    return Text(
+                      statusText,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: _isRecording ? AppTheme.accentColor : AppTheme.textMuted,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          _buildStatusIndicator(),
+          const SizedBox(width: 8),
+          Consumer(
+            builder: (context, ref, child) {
+              final voiceQuality = ref.watch(voiceQualityProvider);
+              final pitchAccuracy = ref.watch(pitchAccuracyProvider);
+              
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceColor.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'AI 점수',
+                      style: TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 10,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.psychology,
+                          color: _getQualityColor(voiceQuality),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${((voiceQuality + pitchAccuracy / 100) / 2 * 100).toStringAsFixed(0)}',
+                          style: TextStyle(
+                            color: _getQualityColor(voiceQuality),
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceColor.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.settings, color: AppTheme.textSecondary),
+              onPressed: () {},
+            ),
+          ),
+          const SizedBox(width: 20),
+        ],
+      ),
+    );
   }
 
-  void _handleAdviceAction(String action) {
-    switch (action) {
-      case 'breathing_guide':
-        ref.read(visualGuideProvider.notifier).startBreathingGuide(
-          ref.read(audioAnalysisProvider).analysis?.breathingType ?? 
-          BreathingType.mixed
-        );
-        break;
-      case 'posture_guide':
-        ref.read(visualGuideProvider.notifier).startPostureGuide();
-        break;
-      case 'mouth_shape_guide':
-        final analysis = ref.read(audioAnalysisProvider).analysis;
-        if (analysis != null) {
-          ref.read(visualGuideProvider.notifier).startMouthShapeGuide(
-            analysis.mouthOpening,
-            analysis.tonguePosition,
-          );
-        }
-        break;
-      case 'resonance_guide':
-        ref.read(visualGuideProvider.notifier).startResonanceGuide(
-          ref.read(audioAnalysisProvider).analysis?.resonancePosition ?? 
-          ResonancePosition.throat
-        );
-        break;
-      case 'step_by_step':
-        setState(() {
-          _showStepByStep = true;
-        });
-        break;
-    }
+  Widget _buildStatusIndicator() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: _isRecording 
+            ? AppTheme.successColor.withOpacity(0.2)
+            : AppTheme.textMuted.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _isRecording ? AppTheme.successColor : AppTheme.textMuted,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: _isRecording ? AppTheme.successColor : AppTheme.textMuted,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            _isRecording ? 'LIVE' : 'READY',
+            style: TextStyle(
+              color: _isRecording ? AppTheme.successColor : AppTheme.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedPitchVisualization() {
+    return const EnhancedPitchVisualizationWidget();
+  }
+
+  Widget _buildControlPanel() {
+    return Container(
+      decoration: AppTheme.glassmorphismDecoration,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: ControlPanelWidget(
+          isRecording: _isRecording,
+          onRecordingToggle: (recording) {
+            setState(() {
+              _isRecording = recording;
+            });
+            if (recording) {
+              ref.read(audioAnalysisProvider.notifier).startAnalysis();
+            } else {
+              ref.read(audioAnalysisProvider.notifier).stopAnalysis();
+            }
+          },
+          onSettingsChanged: (settings) {
+            // Handle settings changes
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _build3DGuidePanel(visualGuideState) {
+    return Container(
+      decoration: AppTheme.glassmorphismDecoration,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: VisualGuideWidget(
+          visualGuideState: visualGuideState,
+          showStepByStep: _showStepByStep,
+          onStepByStepToggle: (enabled) {
+            setState(() {
+              _showStepByStep = enabled;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAICoachingPanel() {
+    return const AICoachingPanel();
   }
   
-  @override
-  void dispose() {
-    // 리소스 정리
-    if (_isRecording) {
-      ref.read(audioAnalysisProvider.notifier).stopRecording();
-    }
-    super.dispose();
+  Widget _buildCoachingPanel(audioState) {
+    return Container(
+      decoration: AppTheme.glassmorphismDecoration,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: CoachingAdviceWidget(
+          analysisResults: audioState.analysisResults,
+          isRealTime: _isRecording,
+        ),
+      ),
+    );
+  }
+  
+  Color _getQualityColor(double quality) {
+    if (quality >= 0.8) return AppTheme.successColor;
+    if (quality >= 0.6) return AppTheme.warningColor;
+    return AppTheme.errorColor;
   }
 }

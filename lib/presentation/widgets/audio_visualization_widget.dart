@@ -170,6 +170,7 @@ class _AudioVisualizationWidgetState extends State<AudioVisualizationWidget>
       child: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.mic,

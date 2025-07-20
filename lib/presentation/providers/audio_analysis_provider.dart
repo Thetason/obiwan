@@ -6,11 +6,17 @@ import '../../domain/entities/vocal_analysis.dart';
 import '../../domain/usecases/analyze_vocal_quality.dart';
 import '../../data/repositories/audio_analysis_repository_impl.dart';
 import '../../features/audio_analysis/audio_capture_service_simple.dart';
+import '../../features/ai_analysis/transformer_audio_analyzer.dart';
+import '../../features/ai_coaching/generative_coaching_engine.dart';
+import '../../features/emotion_style/emotion_style_recognizer.dart';
+import '../../features/audio_enhancement/real_time_audio_enhancer.dart';
+import '../../features/acoustic_analysis/high_precision_analyzer.dart';
 
-// 오디오 분석 상태 클래스
+// Enhanced Audio Analysis State with AI Features
 class AudioAnalysisState {
   final AudioData? audioData;
   final VocalAnalysis? analysis;
+  final List<VocalAnalysis> analysisResults;
   final List<double> pitchData;
   final List<double> waveformData;
   final bool isAnalyzing;
@@ -18,52 +24,154 @@ class AudioAnalysisState {
   final String? error;
   final double recordingLevel;
   
+  // AI Analysis Results
+  final MultiTaskAnalysisResult? aiAnalysis;
+  final EmotionStyleResult? emotionStyleResult;
+  final CoachingResponse? coachingAdvice;
+  final AcousticAnalysisResult? acousticAnalysis;
+  final List<double>? enhancedAudio;
+  
+  // Real-time AI metrics
+  final String currentNote;
+  final double pitchAccuracy;
+  final double cents;
+  final String emotion;
+  final String style;
+  final double voiceQuality;
+  final List<String> realtimeCoaching;
+  
   const AudioAnalysisState({
     this.audioData,
     this.analysis,
+    this.analysisResults = const [],
     this.pitchData = const [],
     this.waveformData = const [],
     this.isAnalyzing = false,
     this.isRecording = false,
     this.error,
     this.recordingLevel = 0.0,
+    
+    // AI Features
+    this.aiAnalysis,
+    this.emotionStyleResult,
+    this.coachingAdvice,
+    this.acousticAnalysis,
+    this.enhancedAudio,
+    
+    // Real-time metrics
+    this.currentNote = '',
+    this.pitchAccuracy = 0.0,
+    this.cents = 0.0,
+    this.emotion = 'Neutral',
+    this.style = 'Unknown',
+    this.voiceQuality = 0.0,
+    this.realtimeCoaching = const [],
   });
   
   AudioAnalysisState copyWith({
     AudioData? audioData,
     VocalAnalysis? analysis,
+    List<VocalAnalysis>? analysisResults,
     List<double>? pitchData,
     List<double>? waveformData,
     bool? isAnalyzing,
     bool? isRecording,
     String? error,
     double? recordingLevel,
+    
+    // AI Features
+    MultiTaskAnalysisResult? aiAnalysis,
+    EmotionStyleResult? emotionStyleResult,
+    CoachingResponse? coachingAdvice,
+    AcousticAnalysisResult? acousticAnalysis,
+    List<double>? enhancedAudio,
+    
+    // Real-time metrics
+    String? currentNote,
+    double? pitchAccuracy,
+    double? cents,
+    String? emotion,
+    String? style,
+    double? voiceQuality,
+    List<String>? realtimeCoaching,
   }) {
     return AudioAnalysisState(
       audioData: audioData ?? this.audioData,
       analysis: analysis ?? this.analysis,
+      analysisResults: analysisResults ?? this.analysisResults,
       pitchData: pitchData ?? this.pitchData,
       waveformData: waveformData ?? this.waveformData,
       isAnalyzing: isAnalyzing ?? this.isAnalyzing,
       isRecording: isRecording ?? this.isRecording,
       error: error ?? this.error,
       recordingLevel: recordingLevel ?? this.recordingLevel,
+      
+      // AI Features
+      aiAnalysis: aiAnalysis ?? this.aiAnalysis,
+      emotionStyleResult: emotionStyleResult ?? this.emotionStyleResult,
+      coachingAdvice: coachingAdvice ?? this.coachingAdvice,
+      acousticAnalysis: acousticAnalysis ?? this.acousticAnalysis,
+      enhancedAudio: enhancedAudio ?? this.enhancedAudio,
+      
+      // Real-time metrics
+      currentNote: currentNote ?? this.currentNote,
+      pitchAccuracy: pitchAccuracy ?? this.pitchAccuracy,
+      cents: cents ?? this.cents,
+      emotion: emotion ?? this.emotion,
+      style: style ?? this.style,
+      voiceQuality: voiceQuality ?? this.voiceQuality,
+      realtimeCoaching: realtimeCoaching ?? this.realtimeCoaching,
     );
   }
 }
 
-// 오디오 분석 컨트롤러
+// Enhanced Audio Analysis Controller with AI Features
 class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
   final AnalyzeVocalQuality _analyzeVocalQuality;
   final AudioCaptureService _audioCaptureService;
   
+  // AI Analysis Engines
+  final TransformerAudioAnalyzer _transformerAnalyzer;
+  final GenerativeCoachingEngine _coachingEngine;
+  final EmotionStyleRecognizer _emotionStyleRecognizer;
+  final RealTimeAudioEnhancer _audioEnhancer;
+  final HighPrecisionAcousticAnalyzer _acousticAnalyzer;
+  
   StreamSubscription? _audioStreamSubscription;
   Timer? _analysisTimer;
+  Timer? _realtimeTimer;
   final List<double> _audioBuffer = [];
   static const int _bufferSize = 48000; // 3초 * 16kHz
   
-  AudioAnalysisController(this._analyzeVocalQuality, this._audioCaptureService) 
-      : super(const AudioAnalysisState());
+  // User profile for personalized coaching
+  final UserProfile _userProfile = UserProfile(
+    name: 'User',
+    experience: 'Intermediate',
+    goal: 'Improve vocal technique',
+    preferredGenre: 'Pop',
+    sessionCount: 1,
+  );
+  
+  final List<String> _conversationHistory = [];
+  
+  AudioAnalysisController(
+    this._analyzeVocalQuality, 
+    this._audioCaptureService,
+    this._transformerAnalyzer,
+    this._coachingEngine,
+    this._emotionStyleRecognizer,
+    this._audioEnhancer,
+    this._acousticAnalyzer,
+  ) : super(const AudioAnalysisState());
+  
+  // 새로운 메서드들 추가
+  Future<void> startAnalysis() async {
+    await startRecording();
+  }
+  
+  Future<void> stopAnalysis() async {
+    await stopRecording();
+  }
   
   Future<void> startRecording() async {
     if (state.isRecording) return;
@@ -92,6 +200,12 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
         (_) => _performAnalysis(),
       );
       
+      // 실시간 AI 분석 (500ms마다)
+      _realtimeTimer = Timer.periodic(
+        const Duration(milliseconds: 500),
+        (_) => _performRealtimeAIAnalysis(),
+      );
+      
     } catch (e) {
       state = state.copyWith(
         isRecording: false,
@@ -106,6 +220,7 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
     await _audioCaptureService.stopCapture();
     await _audioStreamSubscription?.cancel();
     _analysisTimer?.cancel();
+    _realtimeTimer?.cancel();
     
     state = state.copyWith(isRecording: false);
     
@@ -115,9 +230,12 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
     }
   }
   
-  void _onAudioData(List<double> audioChunk) {
-    // 오디오 버퍼에 추가
-    _audioBuffer.addAll(audioChunk);
+  void _onAudioData(List<double> audioChunk) async {
+    // Real-time audio enhancement
+    final enhancedChunk = await _audioEnhancer.processAudioRealTime(audioChunk);
+    
+    // 오디오 버퍼에 추가 (enhanced audio)
+    _audioBuffer.addAll(enhancedChunk);
     
     // 버퍼 크기 제한
     if (_audioBuffer.length > _bufferSize) {
@@ -125,14 +243,15 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
     }
     
     // 실시간 파형 데이터 업데이트
-    _updateWaveformData(audioChunk);
+    _updateWaveformData(enhancedChunk);
     
     // 음성 레벨 계산
-    final level = _calculateAudioLevel(audioChunk);
+    final level = _calculateAudioLevel(enhancedChunk);
     
     state = state.copyWith(
       waveformData: List.from(_audioBuffer.take(1024)), // 시각화용
       recordingLevel: level,
+      enhancedAudio: enhancedChunk,
     );
   }
   
@@ -184,8 +303,8 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
     try {
       // 최근 3초 오디오 데이터 사용
       final analysisBuffer = _audioBuffer.length > 48000 
-          ? _audioBuffer.sublist(_audioBuffer.length - 48000)
-          : List.from(_audioBuffer);
+          ? _audioBuffer.sublist(_audioBuffer.length - 48000).cast<double>()
+          : _audioBuffer.cast<double>();
       
       final audioData = AudioData(
         samples: analysisBuffer.cast<double>(),
@@ -196,7 +315,31 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
         ),
       );
       
+      // Original analysis
       final analysis = await _analyzeVocalQuality(audioData);
+      
+      // AI Transformer Analysis
+      final aiAnalysis = await _transformerAnalyzer.analyzeAudio(analysisBuffer);
+      
+      // Emotion/Style Recognition
+      final emotionStyleResult = await _emotionStyleRecognizer.recognizeRealTime(analysisBuffer);
+      
+      // High-precision acoustic analysis
+      final acousticAnalysis = await _acousticAnalyzer.analyzeAudio(analysisBuffer);
+      
+      // Generate coaching advice
+      final coachingContext = CoachingContext(
+        type: CoachingType.detailed,
+        intensity: 0.7,
+        focus: ['pitch', 'tone', 'emotion'],
+      );
+      
+      final coachingAdvice = await _coachingEngine.generateCoaching(
+        analysisResult: aiAnalysis,
+        userProfile: _userProfile,
+        conversationHistory: _conversationHistory,
+        context: coachingContext,
+      );
       
       // 피치 데이터 업데이트
       final pitchData = List<double>.from(state.pitchData);
@@ -212,6 +355,12 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
         analysis: analysis,
         pitchData: pitchData,
         isAnalyzing: false,
+        
+        // AI Results
+        aiAnalysis: aiAnalysis,
+        emotionStyleResult: emotionStyleResult,
+        coachingAdvice: coachingAdvice,
+        acousticAnalysis: acousticAnalysis,
       );
       
     } catch (e) {
@@ -252,12 +401,175 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
     }
   }
   
+  // Real-time AI analysis for immediate feedback
+  Future<void> _performRealtimeAIAnalysis() async {
+    if (_audioBuffer.length < 8000) return; // Minimum 0.5s audio
+    
+    try {
+      // Use recent 1-second audio for real-time analysis
+      final realtimeBuffer = _audioBuffer.length > 16000
+          ? _audioBuffer.sublist(_audioBuffer.length - 16000).cast<double>()
+          : _audioBuffer.cast<double>();
+      
+      if (realtimeBuffer.isEmpty) return;
+      
+      // Quick pitch detection
+      final fundamentalFreq = _quickPitchDetection(realtimeBuffer);
+      final noteInfo = _frequencyToNoteInfo(fundamentalFreq);
+      
+      // Quick emotion/style recognition
+      final quickEmotion = await _emotionStyleRecognizer.recognizeRealTime(realtimeBuffer);
+      
+      // Calculate voice quality metrics
+      final voiceQuality = _calculateQuickVoiceQuality(realtimeBuffer);
+      
+      // Generate real-time coaching tips
+      final realtimeCoaching = _generateQuickCoachingTips(
+        fundamentalFreq, 
+        noteInfo['accuracy'] as double,
+        quickEmotion,
+        voiceQuality,
+      );
+      
+      state = state.copyWith(
+        currentNote: noteInfo['note'] as String,
+        pitchAccuracy: noteInfo['accuracy'] as double,
+        cents: noteInfo['cents'] as double,
+        emotion: quickEmotion.emotion.emotion,
+        style: quickEmotion.style.style,
+        voiceQuality: voiceQuality,
+        realtimeCoaching: realtimeCoaching,
+      );
+      
+    } catch (e) {
+      // Silently handle realtime analysis errors
+      print('Realtime analysis error: $e');
+    }
+  }
+  
+  double _quickPitchDetection(List<double> audio) {
+    if (audio.length < 2) return 0.0;
+    
+    // Simplified autocorrelation for quick pitch detection
+    double maxCorrelation = 0;
+    int bestLag = 0;
+    
+    for (int lag = 50; lag < math.min(400, audio.length ~/ 2); lag++) {
+      double correlation = 0;
+      for (int i = 0; i < audio.length - lag; i++) {
+        correlation += audio[i] * audio[i + lag];
+      }
+      
+      if (correlation > maxCorrelation) {
+        maxCorrelation = correlation;
+        bestLag = lag;
+      }
+    }
+    
+    return bestLag > 0 ? 16000.0 / bestLag : 0.0;
+  }
+  
+  Map<String, dynamic> _frequencyToNoteInfo(double frequency) {
+    if (frequency <= 0) {
+      return {'note': '', 'accuracy': 0.0, 'cents': 0.0};
+    }
+    
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const a4 = 440.0;
+    
+    // Calculate semitones from A4
+    final semitonesFromA4 = 12 * math.log(frequency / a4) / math.ln2;
+    final noteNumber = (semitonesFromA4 + 9).round(); // +9 to make A=0
+    final octave = (noteNumber / 12).floor() + 4;
+    final noteIndex = noteNumber % 12;
+    
+    // Calculate cents deviation
+    final exactSemitones = 12 * math.log(frequency / a4) / math.ln2 + 9;
+    final cents = ((exactSemitones - noteNumber) * 100).round();
+    
+    // Calculate accuracy (0-1, where 1 is perfect pitch)
+    final accuracy = math.max(0, 1 - (cents.abs() / 50.0)).clamp(0.0, 1.0);
+    
+    final noteName = noteIndex >= 0 && noteIndex < noteNames.length 
+        ? '${noteNames[noteIndex]}$octave' 
+        : '';
+    
+    return {
+      'note': noteName,
+      'accuracy': accuracy,
+      'cents': cents.toDouble(),
+    };
+  }
+  
+  double _calculateQuickVoiceQuality(List<double> audio) {
+    if (audio.isEmpty) return 0.0;
+    
+    // Calculate RMS energy
+    double energy = 0;
+    for (final sample in audio) {
+      energy += sample * sample;
+    }
+    final rms = math.sqrt(energy / audio.length);
+    
+    // Calculate zero crossing rate (voice stability indicator)
+    int zeroCrossings = 0;
+    for (int i = 1; i < audio.length; i++) {
+      if ((audio[i] >= 0) != (audio[i-1] >= 0)) {
+        zeroCrossings++;
+      }
+    }
+    final zcr = zeroCrossings / audio.length.toDouble();
+    
+    // Combine metrics (higher energy + moderate ZCR = better quality)
+    final energyScore = (rms * 10).clamp(0.0, 1.0);
+    final zcrScore = 1.0 - (zcr - 0.1).abs().clamp(0.0, 0.9); // Optimal ZCR around 0.1
+    
+    return (energyScore * 0.7 + zcrScore * 0.3).clamp(0.0, 1.0);
+  }
+  
+  List<String> _generateQuickCoachingTips(
+    double frequency,
+    double pitchAccuracy,
+    EmotionStyleResult emotionStyle,
+    double voiceQuality,
+  ) {
+    final tips = <String>[];
+    
+    // Pitch coaching
+    if (pitchAccuracy < 0.7) {
+      if (frequency > 0) {
+        tips.add('음정을 조금 더 정확하게 맞춰보세요');
+      } else {
+        tips.add('좀 더 명확하게 발성해주세요');
+      }
+    } else if (pitchAccuracy > 0.9) {
+      tips.add('완벽한 음정입니다! 👏');
+    }
+    
+    // Voice quality coaching
+    if (voiceQuality < 0.5) {
+      tips.add('호흡을 더 안정적으로 유지해보세요');
+    }
+    
+    // Emotion coaching
+    if (emotionStyle.emotion.confidence > 0.7) {
+      if (emotionStyle.emotion.emotion == 'Sad') {
+        tips.add('더 밝은 감정을 표현해보세요');
+      } else if (emotionStyle.emotion.emotion == 'Happy') {
+        tips.add('좋은 감정 표현이에요!');
+      }
+    }
+    
+    return tips.take(2).toList(); // Limit to 2 tips for real-time display
+  }
+  
   void clearError() {
     state = state.copyWith(error: null);
   }
   
   void reset() {
     _audioBuffer.clear();
+    _conversationHistory.clear();
     state = const AudioAnalysisState();
   }
   
@@ -265,6 +577,7 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
   void dispose() {
     _audioStreamSubscription?.cancel();
     _analysisTimer?.cancel();
+    _realtimeTimer?.cancel();
     _audioCaptureService.dispose();
     super.dispose();
   }
@@ -277,7 +590,22 @@ final audioAnalysisProvider =
   final analyzeVocalQuality = AnalyzeVocalQuality(repository);
   final audioCaptureService = AudioCaptureService();
   
-  return AudioAnalysisController(analyzeVocalQuality, audioCaptureService);
+  // Initialize AI engines
+  final transformerAnalyzer = TransformerAudioAnalyzer();
+  final coachingEngine = GenerativeCoachingEngine();
+  final emotionStyleRecognizer = EmotionStyleRecognizer();
+  final audioEnhancer = RealTimeAudioEnhancer();
+  final acousticAnalyzer = HighPrecisionAcousticAnalyzer();
+  
+  return AudioAnalysisController(
+    analyzeVocalQuality,
+    audioCaptureService,
+    transformerAnalyzer,
+    coachingEngine,
+    emotionStyleRecognizer,
+    audioEnhancer,
+    acousticAnalyzer,
+  );
 });
 
 // 추가 Provider들
@@ -291,4 +619,45 @@ final currentAnalysisProvider = Provider<VocalAnalysis?>((ref) {
 
 final audioLevelProvider = Provider<double>((ref) {
   return ref.watch(audioAnalysisProvider).recordingLevel;
+});
+
+// New AI-specific providers
+final currentNoteProvider = Provider<String>((ref) {
+  return ref.watch(audioAnalysisProvider).currentNote;
+});
+
+final pitchAccuracyProvider = Provider<double>((ref) {
+  return ref.watch(audioAnalysisProvider).pitchAccuracy;
+});
+
+final centsProvider = Provider<double>((ref) {
+  return ref.watch(audioAnalysisProvider).cents;
+});
+
+final emotionProvider = Provider<String>((ref) {
+  return ref.watch(audioAnalysisProvider).emotion;
+});
+
+final styleProvider = Provider<String>((ref) {
+  return ref.watch(audioAnalysisProvider).style;
+});
+
+final voiceQualityProvider = Provider<double>((ref) {
+  return ref.watch(audioAnalysisProvider).voiceQuality;
+});
+
+final realtimeCoachingProvider = Provider<List<String>>((ref) {
+  return ref.watch(audioAnalysisProvider).realtimeCoaching;
+});
+
+final aiAnalysisProvider = Provider<MultiTaskAnalysisResult?>((ref) {
+  return ref.watch(audioAnalysisProvider).aiAnalysis;
+});
+
+final coachingAdviceProvider = Provider<CoachingResponse?>((ref) {
+  return ref.watch(audioAnalysisProvider).coachingAdvice;
+});
+
+final acousticAnalysisProvider = Provider<AcousticAnalysisResult?>((ref) {
+  return ref.watch(audioAnalysisProvider).acousticAnalysis;
 });

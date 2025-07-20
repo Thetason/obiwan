@@ -2,152 +2,148 @@ import 'package:flutter/material.dart';
 import '../../domain/entities/vocal_analysis.dart';
 
 class CoachingAdviceWidget extends StatelessWidget {
-  final VocalAnalysis? analysis;
-  final bool isRecording;
-  final Function(String) onAdviceAction;
+  final List<VocalAnalysis> analysisResults;
+  final bool isRealTime;
   
   const CoachingAdviceWidget({
     super.key,
-    this.analysis,
-    required this.isRecording,
-    required this.onAdviceAction,
+    required this.analysisResults,
+    required this.isRealTime,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 상단 점수 표시
-          _buildScoreSection(),
+          // Header
+          Row(
+            children: [
+              Icon(
+                isRealTime ? Icons.mic : Icons.mic_off,
+                size: 20,
+                color: isRealTime ? Colors.red : Colors.white30,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isRealTime 
+                  ? 'AI 실시간 코칭'
+                  : '분석 결과',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Score Display
+          if (analysisResults.isNotEmpty)
+            _buildScoreSection(analysisResults.last),
           
           const SizedBox(height: 16),
           
-          // 조언 섹션
+          // Advice Section
           Expanded(
-            child: analysis != null
-                ? _buildAdviceSection()
-                : _buildPlaceholderSection(),
+            child: _buildAdviceSection(),
           ),
         ],
       ),
     );
   }
   
-  Widget _buildScoreSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text(
-          '발성 점수',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+  Widget _buildScoreSection(VocalAnalysis analysis) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            _getScoreColor(analysis.overallScore).withOpacity(0.2),
+            _getScoreColor(analysis.overallScore).withOpacity(0.1),
+          ],
         ),
-        
-        if (analysis != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: _getScoreColor(analysis!.overallScore),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              '${analysis!.overallScore}점',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            '전체 점수',
+            style: TextStyle(color: Colors.white70, fontSize: 16),
+          ),
+          Text(
+            '${analysis.overallScore}점',
+            style: TextStyle(
+              color: _getScoreColor(analysis.overallScore),
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
             ),
           ),
-      ],
+        ],
+      ),
     );
   }
   
   Widget _buildAdviceSection() {
-    final advice = _generateAdvice(analysis!);
-    final actions = _getRecommendedActions(analysis!);
+    if (analysisResults.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.psychology, size: 48, color: Colors.white30),
+            SizedBox(height: 16),
+            Text(
+              '녹음을 시작하면\nAI 코칭을 받을 수 있습니다',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 주요 조언
-        Container(
-          padding: const EdgeInsets.all(16),
+    final advice = _generateAdvice(analysisResults.last);
+    
+    return ListView.builder(
+      itemCount: advice.length,
+      itemBuilder: (context, index) {
+        final item = advice[index];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Text(
-            advice,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              height: 1.4,
-            ),
+          child: Row(
+            children: [
+              Icon(
+                item['icon'] as IconData,
+                color: item['color'] as Color,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  item['text'] as String,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        
-        const SizedBox(height: 16),
-        
-        // 액션 버튼들
-        if (actions.isNotEmpty)
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: actions.map((action) => _buildActionButton(action)).toList(),
-          ),
-      ],
-    );
-  }
-  
-  Widget _buildPlaceholderSection() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            isRecording ? Icons.mic : Icons.mic_off,
-            size: 48,
-            color: isRecording ? Colors.red : Colors.white30,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            isRecording 
-                ? '분석 중...' 
-                : '녹음을 시작하여 AI 코치의 조언을 받아보세요',
-            style: const TextStyle(
-              color: Colors.white60,
-              fontSize: 16,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildActionButton(ActionInfo action) {
-    return ElevatedButton.icon(
-      onPressed: () => onAdviceAction(action.id),
-      icon: Icon(
-        action.icon,
-        size: 18,
-      ),
-      label: Text(action.label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: action.color,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
+        );
+      },
     );
   }
   
@@ -157,102 +153,41 @@ class CoachingAdviceWidget extends StatelessWidget {
     return Colors.red;
   }
   
-  String _generateAdvice(VocalAnalysis analysis) {
-    // 우선순위 기반 조언 생성
-    final issues = <String>[];
+  List<Map<String, dynamic>> _generateAdvice(VocalAnalysis analysis) {
+    final advice = <Map<String, dynamic>>[];
     
-    // 호흡 관련 조언
-    if (analysis.breathingType == BreathingType.chest) {
-      issues.add('복식호흡을 연습하세요. 배를 의식하며 깊게 숨을 들이마세요.');
+    if (analysis.pitchStability < 0.7) {
+      advice.add({
+        'icon': Icons.tune,
+        'color': Colors.orange,
+        'text': '음정 안정성을 향상시키세요. 천천히 부르며 연습하세요.',
+      });
     }
     
-    // 피치 안정성 조언
-    if (analysis.pitchStability < 70) {
-      issues.add('음정이 불안정합니다. 천천히 정확한 음정을 유지하며 연습하세요.');
+    if (analysis.breathingType != BreathingType.diaphragmatic) {
+      advice.add({
+        'icon': Icons.air,
+        'color': Colors.blue,
+        'text': '복식호흡을 연습하세요. 배를 부풀리며 숨을 들이마시세요.',
+      });
     }
     
-    // 공명 위치 조언
-    if (analysis.resonancePosition == ResonancePosition.throat) {
-      issues.add('목 공명보다는 앞쪽(마스크 영역)으로 소리를 보내보세요.');
+    if (analysis.overallScore >= 80) {
+      advice.add({
+        'icon': Icons.star,
+        'color': Colors.yellow,
+        'text': '훌륭합니다! 계속 이 수준을 유지하세요.',
+      });
     }
     
-    // 비브라토 조언
-    if (analysis.vibratoQuality == VibratoQuality.heavy) {
-      issues.add('비브라토가 너무 강합니다. 더 자연스럽게 조절해보세요.');
+    if (advice.isEmpty) {
+      advice.add({
+        'icon': Icons.mic,
+        'color': Colors.grey,
+        'text': '계속 연습하며 기술을 향상시키세요.',
+      });
     }
     
-    // 조언이 없으면 긍정적인 피드백
-    if (issues.isEmpty) {
-      return '훌륭한 발성입니다! 이 상태를 유지하며 계속 연습하세요.';
-    }
-    
-    // 가장 중요한 조언 1-2개만 반환
-    return issues.take(2).join(' ');
+    return advice;
   }
-  
-  List<ActionInfo> _getRecommendedActions(VocalAnalysis analysis) {
-    final actions = <ActionInfo>[];
-    
-    // 호흡 가이드
-    if (analysis.breathingType == BreathingType.chest) {
-      actions.add(ActionInfo(
-        id: 'breathing_guide',
-        label: '호흡 가이드',
-        icon: Icons.air,
-        color: Colors.blue,
-      ));
-    }
-    
-    // 자세 가이드
-    if (analysis.pitchStability < 70) {
-      actions.add(ActionInfo(
-        id: 'posture_guide',
-        label: '자세 교정',
-        icon: Icons.person_pin,
-        color: Colors.orange,
-      ));
-    }
-    
-    // 공명 가이드
-    if (analysis.resonancePosition == ResonancePosition.throat) {
-      actions.add(ActionInfo(
-        id: 'resonance_guide',
-        label: '공명 가이드',
-        icon: Icons.graphic_eq,
-        color: Colors.purple,
-      ));
-    }
-    
-    // 입 모양 가이드
-    actions.add(ActionInfo(
-      id: 'mouth_shape_guide',
-      label: '입 모양',
-      icon: Icons.record_voice_over,
-      color: Colors.green,
-    ));
-    
-    // 단계별 가이드
-    actions.add(ActionInfo(
-      id: 'step_by_step',
-      label: '단계별 학습',
-      icon: Icons.school,
-      color: Colors.indigo,
-    ));
-    
-    return actions;
-  }
-}
-
-class ActionInfo {
-  final String id;
-  final String label;
-  final IconData icon;
-  final Color color;
-  
-  ActionInfo({
-    required this.id,
-    required this.label,
-    required this.icon,
-    required this.color,
-  });
 }

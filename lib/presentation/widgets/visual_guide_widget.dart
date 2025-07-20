@@ -8,11 +8,13 @@ import '../providers/visual_guide_provider.dart';
 class VisualGuideWidget extends ConsumerWidget {
   final VisualGuideState visualGuideState;
   final bool showStepByStep;
+  final Function(bool)? onStepByStepToggle;
   
   const VisualGuideWidget({
     super.key,
     required this.visualGuideState,
     this.showStepByStep = false,
+    this.onStepByStepToggle,
   });
 
   @override
