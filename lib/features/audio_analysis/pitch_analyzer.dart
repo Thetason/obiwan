@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:pitch_detector_dart/pitch_detector_dart.dart';
+import 'package:pitch_detector_dart/pitch_detector.dart';
 
 class PitchAnalyzer {
   static const double minFrequency = 80.0;  // E2
@@ -9,7 +9,7 @@ class PitchAnalyzer {
   final PitchDetector _pitchDetector;
   
   PitchAnalyzer({int sampleRate = 16000}) 
-    : _pitchDetector = PitchDetector(sampleRate.toDouble(), 1024);
+    : _pitchDetector = PitchDetector();
   
   Future<List<double>> analyzePitch(List<double> audioSamples) async {
     final pitchValues = <double>[];
@@ -21,14 +21,24 @@ class PitchAnalyzer {
       // 윈도우 함수 적용 (Hamming window)
       final windowedSamples = _applyHammingWindow(window);
       
-      // 피치 검출
-      final pitchResult = await _pitchDetector.getPitchFromFloatBuffer(windowedSamples);
+      // 피치 검출 (예외 처리 추가)
+      double pitch = 0.0;
+      double probability = 0.0;
+      try {
+        final pitchResult = await _pitchDetector.getPitchFromFloatBuffer(windowedSamples);
+        pitch = pitchResult.pitch;
+        probability = pitchResult.probability;
+      } catch (e) {
+        // 버퍼 크기나 형식 문제로 실패한 경우 기본값 사용
+        pitch = 0.0;
+        probability = 0.0;
+      }
       
-      if (pitchResult.pitch > 0 && 
-          pitchResult.pitch >= minFrequency && 
-          pitchResult.pitch <= maxFrequency &&
-          pitchResult.probability > 0.8) {
-        pitchValues.add(pitchResult.pitch);
+      if (pitch > 0 && 
+          pitch >= minFrequency && 
+          pitch <= maxFrequency &&
+          probability > 0.8) {
+        pitchValues.add(pitch);
       } else {
         pitchValues.add(0.0); // 무성음 또는 신뢰도 낮은 구간
       }
@@ -64,7 +74,7 @@ class PitchAnalyzer {
     // 표준편차가 3 cent 이하면 100점
     final stability = math.max(0, 100 - (stdDev / 3 * 100));
     
-    return stability.clamp(0, 100);
+    return stability.clamp(0, 100).toDouble();
   }
   
   List<double> _applyHammingWindow(List<double> samples) {

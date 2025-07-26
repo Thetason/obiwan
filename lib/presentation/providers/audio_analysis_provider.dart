@@ -1,16 +1,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import '../../domain/entities/audio_data.dart';
 import '../../domain/entities/vocal_analysis.dart';
 import '../../domain/usecases/analyze_vocal_quality.dart';
 import '../../data/repositories/audio_analysis_repository_impl.dart';
 import '../../features/audio_analysis/audio_capture_service_simple.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../features/audio_analysis/web_audio_capture_service.dart';
+import '../../features/audio_analysis/audio_capture_service_interface.dart';
 import '../../features/ai_analysis/transformer_audio_analyzer.dart';
 import '../../features/ai_coaching/generative_coaching_engine.dart';
 import '../../features/emotion_style/emotion_style_recognizer.dart';
 import '../../features/audio_enhancement/real_time_audio_enhancer.dart';
 import '../../features/acoustic_analysis/high_precision_analyzer.dart';
+import '../../features/audio_analysis/pitch_correction_engine.dart';
 
 // Enhanced Audio Analysis State with AI Features
 class AudioAnalysisState {
@@ -40,6 +45,11 @@ class AudioAnalysisState {
   final double voiceQuality;
   final List<String> realtimeCoaching;
   
+  // Pitch correction
+  final bool isPitchCorrectionEnabled;
+  final PitchCorrectionConfig pitchCorrectionConfig;
+  final Float32List? correctedAudio;
+  
   const AudioAnalysisState({
     this.audioData,
     this.analysis,
@@ -66,6 +76,11 @@ class AudioAnalysisState {
     this.style = 'Unknown',
     this.voiceQuality = 0.0,
     this.realtimeCoaching = const [],
+    
+    // Pitch correction
+    this.isPitchCorrectionEnabled = false,
+    this.pitchCorrectionConfig = const PitchCorrectionConfig(),
+    this.correctedAudio,
   });
   
   AudioAnalysisState copyWith({
@@ -94,6 +109,11 @@ class AudioAnalysisState {
     String? style,
     double? voiceQuality,
     List<String>? realtimeCoaching,
+    
+    // Pitch correction
+    bool? isPitchCorrectionEnabled,
+    PitchCorrectionConfig? pitchCorrectionConfig,
+    Float32List? correctedAudio,
   }) {
     return AudioAnalysisState(
       audioData: audioData ?? this.audioData,
@@ -121,6 +141,11 @@ class AudioAnalysisState {
       style: style ?? this.style,
       voiceQuality: voiceQuality ?? this.voiceQuality,
       realtimeCoaching: realtimeCoaching ?? this.realtimeCoaching,
+      
+      // Pitch correction
+      isPitchCorrectionEnabled: isPitchCorrectionEnabled ?? this.isPitchCorrectionEnabled,
+      pitchCorrectionConfig: pitchCorrectionConfig ?? this.pitchCorrectionConfig,
+      correctedAudio: correctedAudio ?? this.correctedAudio,
     );
   }
 }
@@ -128,7 +153,7 @@ class AudioAnalysisState {
 // Enhanced Audio Analysis Controller with AI Features
 class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
   final AnalyzeVocalQuality _analyzeVocalQuality;
-  final AudioCaptureService _audioCaptureService;
+  final AudioCaptureServiceInterface _audioCaptureService;
   
   // AI Analysis Engines
   final TransformerAudioAnalyzer _transformerAnalyzer;
@@ -136,6 +161,7 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
   final EmotionStyleRecognizer _emotionStyleRecognizer;
   final RealTimeAudioEnhancer _audioEnhancer;
   final HighPrecisionAcousticAnalyzer _acousticAnalyzer;
+  final PitchCorrectionEngine _pitchCorrectionEngine;
   
   StreamSubscription? _audioStreamSubscription;
   Timer? _analysisTimer;
@@ -162,6 +188,7 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
     this._emotionStyleRecognizer,
     this._audioEnhancer,
     this._acousticAnalyzer,
+    this._pitchCorrectionEngine,
   ) : super(const AudioAnalysisState());
   
   // 새로운 메서드들 추가
@@ -207,9 +234,23 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
       );
       
     } catch (e) {
+      String errorMessage = e.toString();
+      
+      // Provide user-friendly error messages
+      if (errorMessage.contains('permission') || 
+          errorMessage.contains('Permission') ||
+          errorMessage.contains('denied')) {
+        errorMessage = '마이크 권한이 필요합니다. 브라우저에서 마이크 접근을 허용해주세요.';
+      } else if (errorMessage.contains('not found') || 
+                 errorMessage.contains('webAudioCapture')) {
+        errorMessage = '오디오 시스템을 초기화할 수 없습니다. 페이지를 새로고침해주세요.';
+      } else if (errorMessage.contains('initialize')) {
+        errorMessage = '오디오 시스템 초기화에 실패했습니다. 브라우저가 Web Audio API를 지원하는지 확인해주세요.';
+      }
+      
       state = state.copyWith(
         isRecording: false,
-        error: e.toString(),
+        error: errorMessage,
       );
     }
   }
@@ -231,11 +272,32 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
   }
   
   void _onAudioData(List<double> audioChunk) async {
+    print('[DEBUG] _onAudioData called with chunk size: ${audioChunk.length}');
+    
     // Real-time audio enhancement
     final enhancedChunk = await _audioEnhancer.processAudioRealTime(audioChunk);
     
-    // 오디오 버퍼에 추가 (enhanced audio)
-    _audioBuffer.addAll(enhancedChunk);
+    // Apply pitch correction if enabled
+    Float32List? correctedChunk;
+    if (state.isPitchCorrectionEnabled && enhancedChunk.isNotEmpty) {
+      // Quick pitch detection for real-time correction
+      final pitch = _quickPitchDetection(enhancedChunk);
+      if (pitch > 0) {
+        final float32Chunk = Float32List.fromList(enhancedChunk);
+        correctedChunk = await _pitchCorrectionEngine.processPitchCorrection(
+          float32Chunk,
+          [pitch], // Single pitch value for real-time
+        );
+        
+        // Add corrected audio to buffer
+        _audioBuffer.addAll(correctedChunk);
+      } else {
+        _audioBuffer.addAll(enhancedChunk);
+      }
+    } else {
+      // 오디오 버퍼에 추가 (enhanced audio)
+      _audioBuffer.addAll(enhancedChunk);
+    }
     
     // 버퍼 크기 제한
     if (_audioBuffer.length > _bufferSize) {
@@ -243,15 +305,16 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
     }
     
     // 실시간 파형 데이터 업데이트
-    _updateWaveformData(enhancedChunk);
+    _updateWaveformData(correctedChunk != null ? correctedChunk.toList() : enhancedChunk);
     
     // 음성 레벨 계산
-    final level = _calculateAudioLevel(enhancedChunk);
+    final level = _calculateAudioLevel(correctedChunk != null ? correctedChunk.toList() : enhancedChunk);
     
     state = state.copyWith(
       waveformData: List.from(_audioBuffer.take(1024)), // 시각화용
       recordingLevel: level,
       enhancedAudio: enhancedChunk,
+      correctedAudio: correctedChunk,
     );
   }
   
@@ -296,7 +359,11 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
   }
   
   Future<void> _performAnalysis() async {
-    if (_audioBuffer.length < 16000) return; // 최소 1초 오디오 필요
+    print('[DEBUG] _performAnalysis called, buffer size: ${_audioBuffer.length}');
+    if (_audioBuffer.length < 16000) {
+      print('[DEBUG] Buffer too small for analysis, skipping');
+      return; // 최소 1초 오디오 필요
+    }
     
     state = state.copyWith(isAnalyzing: true);
     
@@ -319,15 +386,22 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
       final analysis = await _analyzeVocalQuality(audioData);
       
       // AI Transformer Analysis
+      print('[DEBUG] Starting AI analysis...');
       final aiAnalysis = await _transformerAnalyzer.analyzeAudio(analysisBuffer);
+      print('[DEBUG] AI analysis complete');
       
       // Emotion/Style Recognition
+      print('[DEBUG] Starting emotion/style recognition...');
       final emotionStyleResult = await _emotionStyleRecognizer.recognizeRealTime(analysisBuffer);
+      print('[DEBUG] Emotion detected: ${emotionStyleResult.emotion.emotion}');
       
       // High-precision acoustic analysis
+      print('[DEBUG] Starting acoustic analysis...');
       final acousticAnalysis = await _acousticAnalyzer.analyzeAudio(analysisBuffer);
+      print('[DEBUG] Acoustic analysis complete');
       
       // Generate coaching advice
+      print('[DEBUG] Generating coaching advice...');
       final coachingContext = CoachingContext(
         type: CoachingType.detailed,
         intensity: 0.7,
@@ -340,6 +414,7 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
         conversationHistory: _conversationHistory,
         context: coachingContext,
       );
+      print('[DEBUG] Coaching advice generated: ${coachingAdvice.mainAdvice}');
       
       // 피치 데이터 업데이트
       final pitchData = List<double>.from(state.pitchData);
@@ -403,7 +478,11 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
   
   // Real-time AI analysis for immediate feedback
   Future<void> _performRealtimeAIAnalysis() async {
-    if (_audioBuffer.length < 8000) return; // Minimum 0.5s audio
+    print('[DEBUG] _performRealtimeAIAnalysis called, buffer size: ${_audioBuffer.length}');
+    if (_audioBuffer.length < 8000) {
+      print('[DEBUG] Buffer too small for realtime analysis');
+      return; // Minimum 0.5s audio
+    }
     
     try {
       // Use recent 1-second audio for real-time analysis
@@ -573,6 +652,24 @@ class AudioAnalysisController extends StateNotifier<AudioAnalysisState> {
     state = const AudioAnalysisState();
   }
   
+  // Pitch correction control methods
+  void togglePitchCorrection() {
+    state = state.copyWith(
+      isPitchCorrectionEnabled: !state.isPitchCorrectionEnabled,
+    );
+  }
+  
+  void updatePitchCorrectionConfig(PitchCorrectionConfig config) {
+    state = state.copyWith(pitchCorrectionConfig: config);
+    
+    // Update engine settings
+    _pitchCorrectionEngine.correctionStrength = config.correctionStrength;
+    _pitchCorrectionEngine.setScale(config.scaleType);
+    _pitchCorrectionEngine.attackTime = config.attackTime;
+    _pitchCorrectionEngine.releaseTime = config.releaseTime;
+    _pitchCorrectionEngine.referencePitch = config.referencePitch;
+  }
+  
   @override
   void dispose() {
     _audioStreamSubscription?.cancel();
@@ -588,7 +685,9 @@ final audioAnalysisProvider =
     StateNotifierProvider<AudioAnalysisController, AudioAnalysisState>((ref) {
   final repository = AudioAnalysisRepositoryImpl();
   final analyzeVocalQuality = AnalyzeVocalQuality(repository);
-  final audioCaptureService = AudioCaptureService();
+  final AudioCaptureServiceInterface audioCaptureService = kIsWeb 
+      ? WebAudioCaptureService() as AudioCaptureServiceInterface
+      : AudioCaptureService() as AudioCaptureServiceInterface;
   
   // Initialize AI engines
   final transformerAnalyzer = TransformerAudioAnalyzer();
@@ -596,6 +695,7 @@ final audioAnalysisProvider =
   final emotionStyleRecognizer = EmotionStyleRecognizer();
   final audioEnhancer = RealTimeAudioEnhancer();
   final acousticAnalyzer = HighPrecisionAcousticAnalyzer();
+  final pitchCorrectionEngine = PitchCorrectionEngine();
   
   return AudioAnalysisController(
     analyzeVocalQuality,
@@ -605,6 +705,7 @@ final audioAnalysisProvider =
     emotionStyleRecognizer,
     audioEnhancer,
     acousticAnalyzer,
+    pitchCorrectionEngine,
   );
 });
 
@@ -660,4 +761,17 @@ final coachingAdviceProvider = Provider<CoachingResponse?>((ref) {
 
 final acousticAnalysisProvider = Provider<AcousticAnalysisResult?>((ref) {
   return ref.watch(audioAnalysisProvider).acousticAnalysis;
+});
+
+// Pitch correction providers
+final isPitchCorrectionEnabledProvider = Provider<bool>((ref) {
+  return ref.watch(audioAnalysisProvider).isPitchCorrectionEnabled;
+});
+
+final pitchCorrectionConfigProvider = Provider<PitchCorrectionConfig>((ref) {
+  return ref.watch(audioAnalysisProvider).pitchCorrectionConfig;
+});
+
+final correctedAudioProvider = Provider<Float32List?>((ref) {
+  return ref.watch(audioAnalysisProvider).correctedAudio;
 });

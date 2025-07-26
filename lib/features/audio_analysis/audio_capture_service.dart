@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'audio_capture_service_interface.dart';
 
-class AudioCaptureService {
+class AudioCaptureService implements AudioCaptureServiceInterface {
   static const int sampleRate = 16000;
   static const int bufferSize = 1024;
   static const int originalSampleRate = 48000;
@@ -42,16 +44,19 @@ class AudioCaptureService {
     
     _isRecording = true;
     
+    // 스트림 컨트롤러 생성
+    final StreamController<Uint8List> recordingDataController = StreamController<Uint8List>();
+    
     // PCM 스트림으로 녹음 시작
     await _recorder.startRecorder(
-      toStream: _audioStreamController!.sink,
+      toStream: recordingDataController.sink,
       codec: Codec.pcm16,
       numChannels: 1,
       sampleRate: originalSampleRate,
     );
     
     // 오디오 데이터 스트림 처리
-    _recordingDataSubscription = _recorder.recordingDataStream!.listen(
+    _recordingDataSubscription = recordingDataController.stream.listen(
       (buffer) {
         // Uint8List를 Float List로 변환
         final samples = _convertBufferToSamples(buffer);

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../ai_analysis/transformer_audio_analyzer.dart';
 import '../../core/utils/random_utils.dart';
+import 'ai_model_loader.dart';
 
 /// GPT-4 Style Generative AI Coaching Engine
 /// Features: LoRA Fine-tuning, RAG, Personalized Coaching
@@ -15,22 +16,59 @@ class GenerativeCoachingEngine {
   late VocalKnowledgeBase _knowledgeBase;
   late LoRAAdapter _loraAdapter;
   late PersonalizationEngine _personalizationEngine;
+  late AIModelLoader _modelLoader;
   
   // Transformer parameters
   late List<List<List<double>>> _attentionWeights;
   late List<List<double>> _feedForwardWeights;
   late Map<String, List<double>> _tokenEmbeddings;
   
+  bool _isInitialized = false;
+  
   GenerativeCoachingEngine() {
     _initializeEngine();
   }
   
   void _initializeEngine() {
-    _knowledgeBase = VocalKnowledgeBase();
-    _loraAdapter = LoRAAdapter();
-    _personalizationEngine = PersonalizationEngine();
-    _initializeTransformerWeights();
-    debugPrint('Generative AI Coaching Engine initialized');
+    try {
+      _knowledgeBase = VocalKnowledgeBase();
+      _loraAdapter = LoRAAdapter();
+      _personalizationEngine = PersonalizationEngine();
+      _modelLoader = AIModelLoader();
+      _initializeTransformerWeights();
+      _loadAIModels();
+      _isInitialized = true;
+      
+      if (kDebugMode) {
+        debugPrint('Generative AI Coaching Engine initialized');
+      }
+    } catch (e) {
+      debugPrint('Failed to initialize Generative AI Coaching Engine: $e');
+      _isInitialized = false;
+    }
+  }
+  
+  /// Load AI models asynchronously
+  Future<void> _loadAIModels() async {
+    try {
+      await _modelLoader.initialize();
+      
+      // Preload core models
+      await _modelLoader.preloadModels([
+        'coaching_generator',
+        'emotion_classifier',
+        'style_analyzer',
+      ]);
+      
+      if (kDebugMode) {
+        final stats = _modelLoader.getStatistics();
+        debugPrint('AI Models loaded: ${stats['total_models']} models, ${stats['total_memory_mb']}MB');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Failed to load AI models: $e');
+      }
+    }
   }
   
   void _initializeTransformerWeights() {
@@ -59,6 +97,11 @@ class GenerativeCoachingEngine {
     required List<String> conversationHistory,
     required CoachingContext context,
   }) async {
+    if (!_isInitialized) {
+      debugPrint('Coaching engine not initialized, using fallback');
+      return _getFallbackResponse(analysisResult);
+    }
+    
     try {
       // 1. RAG: Retrieve relevant knowledge
       final retrievedKnowledge = await _retrieveRelevantKnowledge(analysisResult, context);
@@ -80,7 +123,9 @@ class GenerativeCoachingEngine {
       
       return response;
     } catch (e) {
-      debugPrint('Coaching generation error: $e');
+      if (kDebugMode) {
+        debugPrint('Coaching generation error: $e');
+      }
       return _getFallbackResponse(analysisResult);
     }
   }
@@ -281,6 +326,45 @@ Current analysis:
   }
   
   Future<List<String>> _generateResponse(List<String> contextTokens, UserProfile userProfile) async {
+    try {
+      // Check if we have real models loaded
+      final coachingModel = _modelLoader.getModelInfo('coaching_generator');
+      
+      if (coachingModel != null && !coachingModel.isPlaceholder) {
+        // Use real AI model for generation
+        return await _generateWithRealModel(contextTokens, userProfile, coachingModel);
+      } else {
+        // Use simulated transformer approach
+        return await _generateWithSimulatedModel(contextTokens, userProfile);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Response generation failed: $e');
+      }
+      return _generateFallbackResponse(contextTokens, userProfile);
+    }
+  }
+  
+  Future<List<String>> _generateWithRealModel(
+    List<String> contextTokens, 
+    UserProfile userProfile, 
+    ModelData model
+  ) async {
+    // TODO: Implement TensorFlow Lite inference
+    // This would involve:
+    // 1. Prepare input tensor from contextTokens
+    // 2. Run inference on the model
+    // 3. Post-process output tensor to tokens
+    
+    if (kDebugMode) {
+      debugPrint('Using real model: ${model.name} (${model.memorySizeMB.toStringAsFixed(1)}MB)');
+    }
+    
+    // For now, fall back to simulated model
+    return await _generateWithSimulatedModel(contextTokens, userProfile);
+  }
+  
+  Future<List<String>> _generateWithSimulatedModel(List<String> contextTokens, UserProfile userProfile) async {
     // Convert tokens to embeddings
     final inputEmbeddings = _tokensToEmbeddings(contextTokens);
     
@@ -294,6 +378,17 @@ Current analysis:
     final generatedTokens = _embeddingsToTokens(outputEmbeddings);
     
     return generatedTokens;
+  }
+  
+  List<String> _generateFallbackResponse(List<String> contextTokens, UserProfile userProfile) {
+    // Simple rule-based fallback
+    final responses = [
+      '좋은', '시도입니다', '계속', '연습하세요',
+      '음정을', '안정적으로', '유지해보세요',
+      '호흡을', '깊게', '하고', '발성하세요',
+    ];
+    
+    return responses.take(8).toList();
   }
   
   List<List<double>> _tokensToEmbeddings(List<String> tokens) {
@@ -574,6 +669,23 @@ Current analysis:
       return '목소리에 더 많은 밝기를 추가해보세요. 미소를 지으며 노래해보세요.';
     } else {
       return '꾸준한 연습이 가장 중요합니다. 매일 조금씩이라도 연습하세요.';
+    }
+  }
+  
+  /// Get AI model statistics
+  Map<String, dynamic> getModelStatistics() {
+    if (!_isInitialized) {
+      return {'error': 'Engine not initialized'};
+    }
+    
+    return _modelLoader.getStatistics();
+  }
+  
+  /// Dispose resources
+  void dispose() {
+    if (_isInitialized) {
+      _modelLoader.dispose();
+      _isInitialized = false;
     }
   }
   
