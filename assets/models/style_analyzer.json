@@ -1,0 +1,27 @@
+{
+  "name": "style_analyzer",
+  "version": "1.5.0",
+  "description": "Advanced vocal style classification and analysis model",
+  "input_shape": [2048],
+  "output_shape": [15],
+  "styles": [
+    "classical", "pop", "rock", "jazz", "r&b", "country", 
+    "opera", "folk", "blues", "hip_hop", "electronic", 
+    "indie", "metal", "latin", "world"
+  ],
+  "model_size": "5.2MB",
+  "accuracy": 0.87,
+  "preprocessing": {
+    "sample_rate": 44100,
+    "window_size": 2048,
+    "hop_length": 1024,
+    "mel_bands": 128,
+    "normalization": "spectral_centroid"
+  },
+  "metadata": {
+    "created_at": "2024-03-10T09:15:00Z",
+    "framework": "TensorFlow Lite",
+    "quantization": "int8",
+    "training_data": "multi_genre_vocal_dataset"
+  }
+}

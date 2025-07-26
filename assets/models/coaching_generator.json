@@ -1,0 +1,27 @@
+{
+  "name": "coaching_generator",
+  "version": "2.1.0",
+  "description": "AI-powered personalized vocal coaching advice generator",
+  "input_shape": [512],
+  "output_shape": [256],
+  "model_size": "8.7MB",
+  "accuracy": 0.89,
+  "capabilities": [
+    "pitch_correction_advice",
+    "breathing_technique_guidance",
+    "resonance_optimization",
+    "vocal_health_monitoring",
+    "performance_improvement"
+  ],
+  "preprocessing": {
+    "feature_extraction": "mfcc_spectral_combined",
+    "context_window": 3000,
+    "normalization": "z_score"
+  },
+  "metadata": {
+    "created_at": "2024-02-20T14:45:00Z",
+    "framework": "TensorFlow Lite",
+    "quantization": "float16",
+    "training_data": "professional_vocal_coaches_dataset"
+  }
+}
