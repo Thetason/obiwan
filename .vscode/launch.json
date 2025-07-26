@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "vocal_trainer_ai (demo)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main_demo.dart",
+            "args": [
+                "--web-port",
+                "8080"
+            ]
+        },
+        {
+            "name": "vocal_trainer_ai (main)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart"
+        }
+    ]
+}

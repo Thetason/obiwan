@@ -6,9 +6,13 @@ import '../widgets/coaching_advice_widget.dart';
 import '../widgets/control_panel_widget.dart';
 import '../widgets/enhanced_pitch_visualization_widget.dart';
 import '../widgets/ai_coaching_panel.dart';
+import '../widgets/smart_feedback_widget.dart';
+import '../widgets/vocal_practice_mode_widget.dart';
 import '../providers/audio_analysis_provider.dart';
+import '../providers/real_time_analysis_provider.dart';
 import '../providers/visual_guide_provider.dart';
 import '../../domain/entities/vocal_analysis.dart';
+import '../../features/training_modules/structured_vocal_training.dart';
 import '../../core/theme/app_theme.dart';
 
 class MainAnalysisPage extends ConsumerStatefulWidget {
@@ -22,6 +26,9 @@ class _MainAnalysisPageState extends ConsumerState<MainAnalysisPage>
     with TickerProviderStateMixin {
   bool _isRecording = false;
   bool _showStepByStep = false;
+  bool _showPracticeMode = false;
+  TrainingMode _selectedMode = TrainingMode.breathing;
+  TrainingDifficulty _selectedDifficulty = TrainingDifficulty.beginner;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -47,6 +54,7 @@ class _MainAnalysisPageState extends ConsumerState<MainAnalysisPage>
   Widget build(BuildContext context) {
     final audioState = ref.watch(audioAnalysisProvider);
     final visualGuideState = ref.watch(visualGuideProvider);
+    final realTimeState = ref.watch(realTimeAnalysisProvider);
     
     return Scaffold(
       body: Container(
@@ -87,21 +95,33 @@ class _MainAnalysisPageState extends ConsumerState<MainAnalysisPage>
                       
                       const SizedBox(width: 16),
                       
-                      // Right Column - 3D Guide & AI Coaching
+                      // Right Column - 3D Guide & AI Coaching or Practice Mode
                       Expanded(
                         flex: 1,
                         child: Column(
                           children: [
-                            // 3D Visual Guide
-                            Expanded(
-                              flex: 2,
-                              child: _build3DGuidePanel(visualGuideState),
-                            ),
+                            // Mode Toggle
+                            _buildModeToggle(),
                             const SizedBox(height: 16),
-                            // Enhanced AI Coaching Panel
+                            // Main Right Panel Content
                             Expanded(
-                              flex: 2,
-                              child: _buildAICoachingPanel(),
+                              child: _showPracticeMode 
+                                  ? _buildPracticeModePanel()
+                                  : Column(
+                                      children: [
+                                        // 3D Visual Guide
+                                        Expanded(
+                                          flex: 2,
+                                          child: _build3DGuidePanel(visualGuideState),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        // Smart AI Feedback Panel
+                                        Expanded(
+                                          flex: 2,
+                                          child: _buildSmartFeedbackPanel(),
+                                        ),
+                                      ],
+                                    ),
                             ),
                           ],
                         ),
@@ -312,9 +332,9 @@ class _MainAnalysisPageState extends ConsumerState<MainAnalysisPage>
               _isRecording = recording;
             });
             if (recording) {
-              ref.read(audioAnalysisProvider.notifier).startAnalysis();
+              ref.read(realTimeAnalysisProvider.notifier).startAnalysis();
             } else {
-              ref.read(audioAnalysisProvider.notifier).stopAnalysis();
+              ref.read(realTimeAnalysisProvider.notifier).stopAnalysis();
             }
           },
           onSettingsChanged: (settings) {
@@ -343,6 +363,26 @@ class _MainAnalysisPageState extends ConsumerState<MainAnalysisPage>
     );
   }
 
+  Widget _buildSmartFeedbackPanel() {
+    return Consumer(
+      builder: (context, ref, child) {
+        final feedback = ref.watch(currentFeedbackProvider);
+        final isAnalyzing = ref.watch(isAnalyzingProvider);
+        
+        return Container(
+          decoration: AppTheme.glassmorphismDecoration,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: SmartFeedbackWidget(
+              feedback: feedback,
+              isActive: isAnalyzing,
+            ),
+          ),
+        );
+      },
+    );
+  }
+  
   Widget _buildAICoachingPanel() {
     return const AICoachingPanel();
   }
@@ -360,6 +400,96 @@ class _MainAnalysisPageState extends ConsumerState<MainAnalysisPage>
     );
   }
   
+  Widget _buildModeToggle() {
+    return Container(
+      decoration: AppTheme.glassmorphismDecoration,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          child: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showPracticeMode = false;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: !_showPracticeMode ? AppTheme.primaryGradient : null,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '실시간 분석',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: !_showPracticeMode ? Colors.white : AppTheme.textSecondary,
+                        fontWeight: !_showPracticeMode ? FontWeight.w600 : FontWeight.normal,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showPracticeMode = true;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: _showPracticeMode ? AppTheme.accentGradient : null,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '연습 모드',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _showPracticeMode ? Colors.white : AppTheme.textSecondary,
+                        fontWeight: _showPracticeMode ? FontWeight.w600 : FontWeight.normal,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPracticeModePanel() {
+    return Consumer(
+      builder: (context, ref, child) {
+        final realTimeState = ref.watch(realTimeAnalysisProvider);
+        final currentAnalysis = realTimeState.currentAnalysis;
+        
+        return VocalPracticeModeWidget(
+          isActive: _isRecording,
+          currentAnalysis: currentAnalysis,
+          onModeChanged: (mode) {
+            setState(() {
+              _selectedMode = mode;
+            });
+          },
+          onDifficultyChanged: (difficulty) {
+            setState(() {
+              _selectedDifficulty = difficulty;
+            });
+          },
+        );
+      },
+    );
+  }
+
   Color _getQualityColor(double quality) {
     if (quality >= 0.8) return AppTheme.successColor;
     if (quality >= 0.6) return AppTheme.warningColor;

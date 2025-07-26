@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import '../../features/visual_guide/visual_guide_controller.dart';
+import '../../features/visual_guide/anatomical_2d_visualizer.dart';
 import '../../domain/entities/visual_guide.dart';
+import '../../domain/entities/vocal_analysis.dart';
 import '../providers/visual_guide_provider.dart';
+import '../providers/audio_analysis_provider.dart';
+import '../providers/real_time_analysis_provider.dart';
 
 class VisualGuideWidget extends ConsumerWidget {
   final VisualGuideState visualGuideState;
@@ -19,10 +23,14 @@ class VisualGuideWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final audioState = ref.watch(audioAnalysisProvider);
+    final realTimeState = ref.watch(realTimeAnalysisProvider);
+    final isRecording = realTimeState.isAnalyzing;
+    
     return Stack(
       children: [
-        // 3D 모델 뷰어
-        _build3DModelViewer(context, ref),
+        // 2D 해부학 시각화 또는 3D 모델 뷰어
+        _buildVisualizationView(context, ref, realTimeState),
         
         // 단계별 가이드 오버레이
         if (showStepByStep && visualGuideState.currentGuide != null)
@@ -35,11 +43,20 @@ class VisualGuideWidget extends ConsumerWidget {
         // 에러 메시지
         if (visualGuideState.error != null)
           _buildErrorOverlay(context, ref),
+          
+        // 뷰 전환 버튼
+        Positioned(
+          top: 8,
+          right: 8,
+          child: _buildViewToggleButton(context, ref),
+        ),
       ],
     );
   }
   
-  Widget _build3DModelViewer(BuildContext context, WidgetRef ref) {
+  Widget _buildVisualizationView(BuildContext context, WidgetRef ref, RealTimeAnalysisState realTimeState) {
+    final use2DView = ref.watch(use2DViewProvider);
+    
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -53,9 +70,79 @@ class VisualGuideWidget extends ConsumerWidget {
           ],
         ),
       ),
-      child: visualGuideState.currentGuide != null
-          ? _buildModelViewer(context, ref)
-          : _buildPlaceholder(),
+      child: use2DView 
+          ? _build2DAnatomicalView(context, ref, realTimeState)
+          : (visualGuideState.currentGuide != null
+              ? _buildModelViewer(context, ref)
+              : _buildPlaceholder()),
+    );
+  }
+  
+  Widget _build2DAnatomicalView(BuildContext context, WidgetRef ref, RealTimeAnalysisState realTimeState) {
+    final currentAnalysis = realTimeState.currentAnalysis;
+    
+    return Anatomical2DVisualizer(
+      pitchValue: realTimeState.currentPitch,
+      breathingIntensity: currentAnalysis?.breathingType == BreathingType.diaphragmatic ? 0.8 : 0.3,
+      resonancePosition: _mapResonancePosition(currentAnalysis?.resonancePosition),
+      isVocalizing: realTimeState.isAnalyzing,
+      formants: currentAnalysis?.formants.asMap().map((index, value) => MapEntry(index.toString(), value)) ?? {},
+    );
+  }
+  
+  String _mapResonancePosition(ResonancePosition? resonancePosition) {
+    switch (resonancePosition) {
+      case ResonancePosition.throat:
+        return 'throat';
+      case ResonancePosition.mouth:
+        return 'mouth';
+      case ResonancePosition.head:
+        return 'head';
+      case ResonancePosition.mixed:
+        return 'mixed';
+      default:
+        return 'throat';
+    }
+  }
+  
+  Widget _buildViewToggleButton(BuildContext context, WidgetRef ref) {
+    final use2DView = ref.watch(use2DViewProvider);
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(
+              Icons.view_in_ar,
+              color: !use2DView ? Colors.blue : Colors.white60,
+            ),
+            onPressed: () => ref.read(use2DViewProvider.notifier).state = false,
+            tooltip: '3D 뷰',
+          ),
+          Container(
+            width: 1,
+            height: 24,
+            color: Colors.white24,
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.layers,
+              color: use2DView ? Colors.blue : Colors.white60,
+            ),
+            onPressed: () => ref.read(use2DViewProvider.notifier).state = true,
+            tooltip: '2D 해부학 뷰',
+          ),
+        ],
+      ),
     );
   }
   
@@ -340,3 +427,6 @@ class HighlightPainter extends CustomPainter {
            oldDelegate.animationProgress != animationProgress;
   }
 }
+
+// 2D/3D 뷰 전환을 위한 Provider
+final use2DViewProvider = StateProvider<bool>((ref) => true);
