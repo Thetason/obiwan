@@ -4,6 +4,7 @@ import 'presentation/pages/enhanced_main_analysis_page.dart';
 import 'features/visual_guide/model_loader.dart';
 import 'core/theme/enhanced_app_theme.dart';
 import 'screens/real_time_pitch_screen.dart';
+import 'screens/dual_engine_pitch_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +36,7 @@ class VocalTrainerApp extends StatelessWidget {
         '/': (context) => const MainMenuScreen(),
         '/enhanced_analysis': (context) => const EnhancedMainAnalysisPage(),
         '/realtime_pitch': (context) => const RealTimePitchScreen(),
+        '/dual_engine': (context) => const DualEnginePitchScreen(),
       },
       debugShowCheckedModeBanner: false,
     );
@@ -80,7 +82,29 @@ class MainMenuScreen extends StatelessWidget {
             ),
             const SizedBox(height: 40),
             
-            // 실시간 피치 분석 (CREPE)
+            // 듀얼 엔진 피치 분석 (CREPE + SPICE)
+            SizedBox(
+              width: double.infinity,
+              height: 60,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/dual_engine');
+                },
+                icon: const Icon(Icons.auto_awesome, size: 30),
+                label: const Text(
+                  '듀얼 엔진 분석 (CREPE + SPICE)',
+                  style: TextStyle(fontSize: 18),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // CREPE 단일 분석
             SizedBox(
               width: double.infinity,
               height: 60,
@@ -90,11 +114,11 @@ class MainMenuScreen extends StatelessWidget {
                 },
                 icon: const Icon(Icons.graphic_eq, size: 30),
                 label: const Text(
-                  '실시간 피치 분석 (CREPE)',
+                  'CREPE 단일 분석',
                   style: TextStyle(fontSize: 18),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
+                  backgroundColor: Colors.indigo,
                   foregroundColor: Colors.white,
                 ),
               ),
@@ -135,7 +159,15 @@ class MainMenuScreen extends StatelessWidget {
                       children: [
                         Icon(Icons.computer, color: Colors.green),
                         SizedBox(width: 10),
-                        Text('CREPE 서버: localhost:5002'),
+                        Text('CREPE: localhost:5002'),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.computer, color: Colors.orange),
+                        SizedBox(width: 10),
+                        Text('SPICE: localhost:5003'),
                       ],
                     ),
                     SizedBox(height: 8),
@@ -143,7 +175,7 @@ class MainMenuScreen extends StatelessWidget {
                       children: [
                         Icon(Icons.precision_manufacturing, color: Colors.blue),
                         SizedBox(width: 10),
-                        Text('모델: Official CREPE CNN'),
+                        Text('듀얼 AI 피치 분석 시스템'),
                       ],
                     ),
                   ],
