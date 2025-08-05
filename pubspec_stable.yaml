@@ -1,0 +1,63 @@
+name: vocal_trainer_ai
+description: "AI-powered vocal training application with CREPE pitch analysis"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 안정적인 UI 라이브러리들
+  cupertino_icons: ^1.0.8
+  
+  # 🔧 안정적인 오디오 라이브러리 (다운그레이드)
+  flutter_sound: ^8.5.0    # 더 안정적인 구버전 사용
+  audio_session: ^0.1.13   # 권한 관리 간소화
+  
+  # 🎯 HTTP 통신 (CREPE 서버와 통신용)
+  http: ^1.2.0
+  dio: ^5.4.0              # 더 강력한 HTTP 클라이언트
+  
+  # 📊 오디오 처리 기본 라이브러리
+  fftea: ^1.5.0+1
+  
+  # 🎨 안정적인 UI 패키지들
+  flutter_riverpod: ^2.6.1
+  shared_preferences: ^2.5.3
+  permission_handler: ^12.0.1
+  
+  # 📱 실시간 차트 및 시각화
+  fl_chart: ^0.66.0
+  syncfusion_flutter_charts: ^24.1.41
+  
+  # 🔊 실시간 오디오 처리
+  record: ^5.0.5           # 간단하고 안정적인 녹음
+  just_audio: ^0.9.39     # 안정적인 오디오 재생
+  
+  # 🔢 수학 및 신호 처리
+  vector_math: ^2.1.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  mockito: ^5.4.6
+  build_runner: ^2.5.4
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/audio/
+    - assets/exercises/
+    
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Regular.ttf
+        - asset: assets/fonts/Pretendard-Bold.ttf
+          weight: 700
