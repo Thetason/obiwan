@@ -19,6 +19,15 @@ class RealTimeAudioRecorder: NSObject, AVAudioPlayerDelegate {
   }
   
   private func setupAudioEngine() {
+    // 기존 엔진이 있으면 완전히 정리
+    if let engine = audioEngine {
+      if engine.isRunning {
+        engine.stop()
+      }
+      audioEngine = nil
+      inputNode = nil
+    }
+    
     audioEngine = AVAudioEngine()
     inputNode = audioEngine?.inputNode
     print("🔧 [RealTime] 오디오 엔진 초기화 완료")
@@ -143,12 +152,14 @@ class RealTimeAudioRecorder: NSObject, AVAudioPlayerDelegate {
       return
     }
     
-    // 탭 제거
+    // 안전하게 탭 제거
     input.removeTap(onBus: 0)
+    print("✅ [RealTime] 입력 탭 제거 완료")
     
-    // 엔진 중지
+    // 엔진 중지 (안전하게)
     if engine.isRunning {
       engine.stop()
+      print("✅ [RealTime] 오디오 엔진 중지 완료")
     }
     
     isRecording = false
@@ -156,6 +167,11 @@ class RealTimeAudioRecorder: NSObject, AVAudioPlayerDelegate {
     let duration = recordingStartTime?.timeIntervalSinceNow ?? 0
     print("✅ [RealTime] 녹음 중지 완료")
     print("📊 [RealTime] 총 샘플: \(recordedSamples.count), 시간: \(String(format: "%.1f", abs(duration)))초")
+    
+    // 재생을 위해 엔진 리셋
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+      self.setupAudioEngine()
+    }
     
     result(true)
   }
@@ -185,31 +201,54 @@ class RealTimeAudioRecorder: NSObject, AVAudioPlayerDelegate {
       return
     }
     
+    // 기존 플레이어 정리
+    if let player = audioPlayer {
+      player.stop()
+      audioPlayer = nil
+    }
+    playbackTimer?.invalidate()
+    playbackTimer = nil
+    
     // 녹음된 Float 배열을 임시 오디오 파일로 변환
     do {
       let tempURL = createTempAudioFile(samples: recordedSamples)
+      print("📁 [RealTime] 임시 파일 생성: \(tempURL.path)")
+      
+      // 파일 존재 확인
+      guard FileManager.default.fileExists(atPath: tempURL.path) else {
+        print("❌ [RealTime] 임시 오디오 파일이 생성되지 않음")
+        result(false)
+        return
+      }
       
       // AVAudioPlayer로 재생
       audioPlayer = try AVAudioPlayer(contentsOf: tempURL)
       audioPlayer?.delegate = self
-      audioPlayer?.prepareToPlay()
+      
+      guard audioPlayer?.prepareToPlay() == true else {
+        print("❌ [RealTime] 오디오 플레이어 준비 실패")
+        result(false)
+        return
+      }
       
       if audioPlayer?.play() == true {
         print("✅ [RealTime] 실제 오디오 재생 시작 - 길이: \(String(format: "%.1f", audioPlayer?.duration ?? 0))초")
         
         // 재생 완료를 모니터링
-        playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] timer in
           guard let player = self?.audioPlayer else {
-            self?.playbackTimer?.invalidate()
+            timer.invalidate()
             return
           }
           
           if !player.isPlaying {
-            self?.playbackTimer?.invalidate()
+            timer.invalidate()
             print("⏸️ [RealTime] 재생 완료")
             
-            // 임시 파일 삭제
-            try? FileManager.default.removeItem(at: tempURL)
+            // 임시 파일 삭제 (지연)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+              try? FileManager.default.removeItem(at: tempURL)
+            }
           }
         }
         
@@ -227,29 +266,48 @@ class RealTimeAudioRecorder: NSObject, AVAudioPlayerDelegate {
   
   private func createTempAudioFile(samples: [Float]) -> URL {
     let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-    let tempURL = documentsPath.appendingPathComponent("temp_playback.wav")
+    let tempURL = documentsPath.appendingPathComponent("temp_playback_\(Int(Date().timeIntervalSince1970)).wav")
+    
+    // 기존 파일이 있으면 삭제
+    try? FileManager.default.removeItem(at: tempURL)
     
     // 실제 녹음된 샘플레이트와 동일하게 설정 (48kHz)
-    let sampleRate: Double = 48000.0  // 녹음과 동일한 48kHz로 변경
-    let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)!
+    let sampleRate: Double = 48000.0
+    
+    guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false) else {
+      print("❌ [RealTime] 오디오 포맷 생성 실패")
+      return tempURL
+    }
     
     do {
+      // 안전한 파일 생성
       let audioFile = try AVAudioFile(forWriting: tempURL, settings: format.settings)
       
-      guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else {
+      let frameCapacity = AVAudioFrameCount(samples.count)
+      guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
         print("❌ [RealTime] 버퍼 생성 실패")
         return tempURL
       }
       
-      // Float 샘플을 버퍼에 복사
-      let channelData = buffer.floatChannelData![0]
-      for i in 0..<samples.count {
+      // Float 샘플을 버퍼에 안전하게 복사
+      guard let channelData = buffer.floatChannelData?[0] else {
+        print("❌ [RealTime] 채널 데이터 접근 실패")
+        return tempURL
+      }
+      
+      let sampleCount = min(samples.count, Int(frameCapacity))
+      for i in 0..<sampleCount {
         channelData[i] = samples[i]
       }
-      buffer.frameLength = AVAudioFrameCount(samples.count)
+      buffer.frameLength = AVAudioFrameCount(sampleCount)
       
       try audioFile.write(from: buffer)
-      print("📁 [RealTime] 임시 재생 파일 생성: \(samples.count) 샘플 -> \(tempURL.lastPathComponent)")
+      print("📁 [RealTime] 임시 재생 파일 생성: \(sampleCount) 샘플 -> \(tempURL.lastPathComponent)")
+      
+      // 파일 크기 확인
+      if let fileSize = try? FileManager.default.attributesOfItem(atPath: tempURL.path)[.size] as? Int {
+        print("📊 [RealTime] 생성된 파일 크기: \(fileSize) bytes")
+      }
       
     } catch {
       print("❌ [RealTime] 임시 파일 생성 실패: \(error)")
