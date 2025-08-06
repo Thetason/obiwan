@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../widgets/wave_visualizer_widget.dart';
 import '../services/dual_engine_service.dart';
+import '../widgets/audio_player_widget.dart';
+import '../services/native_audio_service.dart';
 import 'fixed_vocal_training_screen.dart';
 
 class WaveStartScreen extends StatefulWidget {
@@ -15,9 +17,11 @@ class _WaveStartScreenState extends State<WaveStartScreen>
   
   // 서비스 및 상태 관리
   final DualEngineService _engineService = DualEngineService();
+  final NativeAudioService _audioService = NativeAudioService.instance;
   bool _isRecording = false;
   double _audioLevel = 0.0;
   TouchState _touchState = TouchState.idle;
+  List<double>? _recordedAudioData;
   
   // 애니메이션 컨트롤러
   late AnimationController _backgroundController;
@@ -49,7 +53,14 @@ class _WaveStartScreenState extends State<WaveStartScreen>
   }
 
   void _initializeAudioService() {
-    // 오디오 서비스 초기화 (현재는 더미)
+    // 오디오 레벨 콜백 설정
+    _audioService.onAudioLevelChanged = (level) {
+      if (mounted) {
+        setState(() {
+          _audioLevel = level;
+        });
+      }
+    };
     print('🎵 오디오 서비스 초기화 완료');
   }
 
@@ -61,11 +72,23 @@ class _WaveStartScreenState extends State<WaveStartScreen>
     });
     
     try {
-      // 실제 녹음 시작 로직 (더미)
-      await Future.delayed(const Duration(milliseconds: 100));
-      print('🎤 녹음 시작됨');
+      // 실제 녹음 시작
+      final success = await _audioService.startRecording();
+      if (success) {
+        print('🎤 네이티브 녹음 시작됨');
+      } else {
+        print('❌ 녹음 시작 실패');
+        setState(() {
+          _isRecording = false;
+          _touchState = TouchState.idle;
+        });
+      }
     } catch (e) {
       print('녹음 시작 오류: $e');
+      setState(() {
+        _isRecording = false;
+        _touchState = TouchState.idle;
+      });
     }
   }
 
@@ -77,16 +100,28 @@ class _WaveStartScreenState extends State<WaveStartScreen>
     });
     
     try {
-      // 실제 녹음 종료 및 분석 (더미)
-      await Future.delayed(const Duration(milliseconds: 100));
-      print('🎤 녹음 종료 및 분석 시작');
+      // 실제 녹음 종료
+      await _audioService.stopRecording();
+      print('🎤 네이티브 녹음 종료');
       
-      // 3초 후 결과 화면으로 이동
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          _navigateToResults();
-        }
-      });
+      // 녹음된 오디오 데이터 가져오기
+      final audioData = await _audioService.getRecordedAudio();
+      if (audioData != null && audioData.isNotEmpty) {
+        print('🎵 녹음된 오디오 데이터: ${audioData.length} 샘플');
+        _recordedAudioData = audioData;
+        
+        // 1초 후 결과 화면으로 이동
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            _navigateToResults();
+          }
+        });
+      } else {
+        print('❌ 오디오 데이터가 없습니다');
+        setState(() {
+          _touchState = TouchState.idle;
+        });
+      }
       
     } catch (e) {
       print('분석 오류: $e');
@@ -97,10 +132,39 @@ class _WaveStartScreenState extends State<WaveStartScreen>
   }
 
   void _navigateToResults() {
+    // 실제 녹음된 오디오 데이터 사용
+    final audioData = _recordedAudioData ?? [];
+    
+    // 녹음 시간 계산 (44.1kHz 기준)
+    final duration = Duration(
+      milliseconds: ((audioData.length / 44100) * 1000).round(),
+    );
+    
     Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const FixedVocalTrainingScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) => Scaffold(
+          backgroundColor: const Color(0xFF0F0F23),
+          body: SafeArea(
+            child: AudioPlayerWidget(
+              audioData: audioData,
+              duration: duration,
+              onAnalyze: () {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => const FixedVocalTrainingScreen(),
+                  ),
+                );
+              },
+              onReRecord: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _recordedAudioData = null;
+                  _touchState = TouchState.idle;
+                });
+              },
+            ),
+          ),
+        ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
