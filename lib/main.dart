@@ -1,26 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'presentation/pages/enhanced_main_analysis_page.dart';
-import 'features/visual_guide/model_loader.dart';
-import 'core/theme/enhanced_app_theme.dart';
-import 'screens/real_time_pitch_screen.dart';
-import 'screens/dual_engine_pitch_screen.dart';
+import 'package:flutter/services.dart';
+import 'screens/enhanced_home_screen.dart';
+import 'screens/fixed_vocal_training_screen.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 3D 모델 미리 로드
-  try {
-    await ModelLoader().preloadModels();
-  } catch (e) {
-    debugPrint('Model preload failed: $e');
-  }
-  
-  runApp(
-    const ProviderScope(
-      child: VocalTrainerApp(),
+  // 시스템 UI 설정
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Color(0xFF0F0F23),
+      systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
+  
+  runApp(const VocalTrainerApp());
 }
 
 class VocalTrainerApp extends StatelessWidget {
@@ -29,162 +25,49 @@ class VocalTrainerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AI 보컬 트레이너',
-      theme: ThemeData.dark(),
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const MainMenuScreen(),
-        '/enhanced_analysis': (context) => const EnhancedMainAnalysisPage(),
-        '/realtime_pitch': (context) => const RealTimePitchScreen(),
-        '/dual_engine': (context) => const DualEnginePitchScreen(),
-      },
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
-
-class MainMenuScreen extends StatelessWidget {
-  const MainMenuScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('오비완 v2 - AI 보컬 트레이너'),
-        backgroundColor: Colors.deepPurple,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.music_note,
-              size: 100,
-              color: Colors.deepPurple,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              '오비완 v2',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'AI 보컬 트레이닝 앱',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 40),
-            
-            // 듀얼 엔진 피치 분석 (CREPE + SPICE)
-            SizedBox(
-              width: double.infinity,
-              height: 60,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/dual_engine');
-                },
-                icon: const Icon(Icons.auto_awesome, size: 30),
-                label: const Text(
-                  '듀얼 엔진 분석 (CREPE + SPICE)',
-                  style: TextStyle(fontSize: 18),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // CREPE 단일 분석
-            SizedBox(
-              width: double.infinity,
-              height: 60,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/realtime_pitch');
-                },
-                icon: const Icon(Icons.graphic_eq, size: 30),
-                label: const Text(
-                  'CREPE 단일 분석',
-                  style: TextStyle(fontSize: 18),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // 고급 분석
-            SizedBox(
-              width: double.infinity,
-              height: 60,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/enhanced_analysis');
-                },
-                icon: const Icon(Icons.analytics, size: 30),
-                label: const Text(
-                  '고급 보컬 분석',
-                  style: TextStyle(fontSize: 18),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueGrey,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 40),
-            
-            // 서버 상태 표시
-            Card(
-              color: Colors.grey[850],
-              child: const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.computer, color: Colors.green),
-                        SizedBox(width: 10),
-                        Text('CREPE: localhost:5002'),
-                      ],
-                    ),
-                    SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.computer, color: Colors.orange),
-                        SizedBox(width: 10),
-                        Text('SPICE: localhost:5003'),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.precision_manufacturing, color: Colors.blue),
-                        SizedBox(width: 10),
-                        Text('듀얼 AI 피치 분석 시스템'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+      title: '오비완 v2 - 듀얼 AI 보컬 트레이너',
+      theme: ThemeData(
+        primaryColor: const Color(0xFF6366F1),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF6366F1),
+          secondary: Color(0xFF8B5CF6),
+          surface: Color(0xFF1A1B23),
+          background: Color(0xFF0F0F23),
+          onPrimary: Colors.white,
+          onSecondary: Colors.white,
+          onSurface: Colors.white,
+          onBackground: Colors.white,
+        ),
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        fontFamily: 'System',
+        textTheme: const TextTheme(
+          headlineLarge: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          headlineMedium: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          bodyLarge: TextStyle(
+            fontSize: 16,
+            color: Colors.white,
+          ),
+          bodyMedium: TextStyle(
+            fontSize: 14,
+            color: Colors.white70,
+          ),
         ),
       ),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const EnhancedHomeScreen(),
+        '/training': (context) => const FixedVocalTrainingScreen(),
+      },
+      debugShowCheckedModeBanner: false,
     );
   }
 }

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>오비완 v2 테스트</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: linear-gradient(135deg, #0F0F23, #1A1B23);
+      color: white;
+      text-align: center;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 40px;
+    }
+    .status {
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .success { background: rgba(16, 185, 129, 0.2); }
+    .error { background: rgba(239, 68, 68, 0.2); }
+    button {
+      background: #6366F1;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      background: #5B5AF0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎵 오비완 v2 - 듀얼 AI 보컬 트레이너</h1>
+    
+    <div class="status" id="crepeStatus">
+      📡 CREPE 서버 확인 중...
+    </div>
+    
+    <div class="status" id="spiceStatus">
+      📡 SPICE 서버 확인 중...
+    </div>
+    
+    <div class="status" id="micStatus">
+      🎤 마이크 권한 확인 중...
+    </div>
+    
+    <button onclick="checkServers()">서버 상태 새로고침</button>
+    <button onclick="testMicrophone()">마이크 테스트</button>
+    <button onclick="openFlutterApp()">Flutter 앱 열기</button>
+    
+    <div style="margin-top: 40px;">
+      <h3>🔧 수동 서버 시작 방법</h3>
+      <p>1. CREPE 서버:</p>
+      <code style="background: rgba(0,0,0,0.3); padding: 10px; display: block; margin: 10px 0;">
+        cd /Users/seoyeongbin/crepe_setup && source crepe_env/bin/activate && python official_crepe_server.py
+      </code>
+      
+      <p>2. SPICE 서버:</p>
+      <code style="background: rgba(0,0,0,0.3); padding: 10px; display: block; margin: 10px 0;">
+        cd /Users/seoyeongbin/crepe_setup && source crepe_env/bin/activate && python spice_server.py
+      </code>
+    </div>
+  </div>
+
+  <script>
+    async function checkServers() {
+      // CREPE 서버 확인
+      try {
+        const crepeResponse = await fetch('http://localhost:5002/health');
+        const crepeData = await crepeResponse.json();
+        document.getElementById('crepeStatus').innerHTML = '✅ CREPE 서버 정상 동작 (포트 5002)';
+        document.getElementById('crepeStatus').className = 'status success';
+      } catch (error) {
+        document.getElementById('crepeStatus').innerHTML = '❌ CREPE 서버 오프라인 (포트 5002)';
+        document.getElementById('crepeStatus').className = 'status error';
+      }
+      
+      // SPICE 서버 확인
+      try {
+        const spiceResponse = await fetch('http://localhost:5003/health');
+        const spiceData = await spiceResponse.json();
+        document.getElementById('spiceStatus').innerHTML = '✅ SPICE 서버 정상 동작 (포트 5003)';
+        document.getElementById('spiceStatus').className = 'status success';
+      } catch (error) {
+        document.getElementById('spiceStatus').innerHTML = '❌ SPICE 서버 오프라인 (포트 5003)';
+        document.getElementById('spiceStatus').className = 'status error';
+      }
+    }
+    
+    async function testMicrophone() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        document.getElementById('micStatus').innerHTML = '✅ 마이크 권한 허용됨';
+        document.getElementById('micStatus').className = 'status success';
+        
+        // 즉시 정지
+        stream.getTracks().forEach(track => track.stop());
+      } catch (error) {
+        document.getElementById('micStatus').innerHTML = '❌ 마이크 권한 거부됨: ' + error.message;
+        document.getElementById('micStatus').className = 'status error';
+      }
+    }
+    
+    function openFlutterApp() {
+      window.open('http://localhost:8081', '_blank');
+    }
+    
+    // 페이지 로드 시 자동 확인
+    window.addEventListener('load', function() {
+      checkServers();
+      testMicrophone();
+    });
+  </script>
+</body>
+</html>

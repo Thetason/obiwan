@@ -1,38 +1,157 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="듀얼 AI 엔진 보컬 트레이닝 앱 (CREPE + SPICE)">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="vocal_trainer_ai">
+  <meta name="apple-mobile-web-app-title" content="오비완 v2">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>AI Vocal Trainer</title>
+  <title>오비완 v2 - 듀얼 AI 보컬 트레이너</title>
   <link rel="manifest" href="manifest.json">
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #0F0F23, #1A1B23);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    
+    .loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #0F0F23, #1A1B23);
+      z-index: 9999;
+    }
+    
+    .loading-content {
+      text-align: center;
+      color: white;
+    }
+    
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 3px solid #374151;
+      border-top: 3px solid #6366F1;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .permission-notice {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(239, 68, 68, 0.9);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 10000;
+      display: none;
+      max-width: 80%;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
+  <div class="loading" id="loading">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <h2>오비완 v2 로딩 중...</h2>
+      <p>듀얼 AI 엔진 초기화 중</p>
+    </div>
+  </div>
+  
+  <div class="permission-notice" id="micPermissionNotice">
+    🎤 마이크 권한이 필요합니다. 브라우저 주소창 왼쪽의 🔒 아이콘을 클릭하여 마이크 권한을 허용해주세요.
+  </div>
+
+  <script>
+    // 마이크 권한 자동 요청 및 안내
+    async function checkMicrophonePermission() {
+      try {
+        // 마이크 권한 상태 확인
+        const permissionStatus = await navigator.permissions.query({name: 'microphone'});
+        
+        if (permissionStatus.state === 'denied') {
+          document.getElementById('micPermissionNotice').style.display = 'block';
+        }
+        
+        // 권한 상태 변경 감지
+        permissionStatus.onchange = function() {
+          if (this.state === 'denied') {
+            document.getElementById('micPermissionNotice').style.display = 'block';
+          } else {
+            document.getElementById('micPermissionNotice').style.display = 'none';
+          }
+        };
+        
+        // 첫 접속시 자동으로 마이크 권한 요청
+        if (permissionStatus.state === 'prompt') {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(track => track.stop()); // 즉시 정지
+            console.log('✅ 마이크 권한 허용됨');
+          } catch (error) {
+            console.log('❌ 마이크 권한 거부됨:', error);
+            document.getElementById('micPermissionNotice').style.display = 'block';
+          }
+        }
+        
+      } catch (error) {
+        console.log('권한 확인 실패:', error);
+      }
+    }
+    
+    // 페이지 로드 시 권한 확인
+    document.addEventListener('DOMContentLoaded', checkMicrophonePermission);
+    
+    // 로딩 화면 제거 (더 빠른 타임아웃)
+    window.addEventListener('flutter-first-frame', function() {
+      document.getElementById('loading').style.display = 'none';
+    });
+    
+    // 더 빠른 타임아웃으로 로딩 화면 제거
+    setTimeout(() => {
+      console.log('타임아웃으로 로딩 화면 제거');
+      document.getElementById('loading').style.display = 'none';
+    }, 3000);
+    
+    // Flutter 앱 준비 감지
+    window.addEventListener('load', function() {
+      setTimeout(() => {
+        if (document.getElementById('loading').style.display !== 'none') {
+          console.log('페이지 로드 완료로 로딩 화면 제거');
+          document.getElementById('loading').style.display = 'none';
+        }
+      }, 2000);
+    });
+  </script>
+  
   <script src="audio_capture.js"></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
