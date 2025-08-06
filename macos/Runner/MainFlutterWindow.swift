@@ -2,171 +2,278 @@ import Cocoa
 import FlutterMacOS
 import AVFoundation
 
-class SimpleAudioRecorder {
-  private var audioRecorder: AVAudioRecorder?
-  private var audioPlayer: AVAudioPlayer?
-  private var recordingURL: URL?
+class RealTimeAudioRecorder: NSObject, AVAudioPlayerDelegate {
+  private var audioEngine: AVAudioEngine?
+  private var inputNode: AVAudioInputNode?
   private var channel: FlutterMethodChannel?
+  private var isRecording = false
+  private var recordedSamples: [Float] = []
+  private var recordingStartTime: Date?
+  private var audioPlayer: AVAudioPlayer?
+  private var playbackTimer: Timer?
   
   init(channel: FlutterMethodChannel) {
     self.channel = channel
-    setupRecordingURL()
+    super.init()
+    setupAudioEngine()
   }
   
-  private func setupRecordingURL() {
-    let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-    recordingURL = documentsPath.appendingPathComponent("recording.caf")
+  private func setupAudioEngine() {
+    audioEngine = AVAudioEngine()
+    inputNode = audioEngine?.inputNode
+    print("🔧 [RealTime] 오디오 엔진 초기화 완료")
   }
   
   func startRecording(result: @escaping FlutterResult) {
-    // 마이크 권한 확인
-    let status = AVCaptureDevice.authorizationStatus(for: .audio)
-    print("🔐 [SimpleRecorder] 마이크 권한: \(status.rawValue)")
+    print("🎙️ [RealTime] 녹음 시작 요청")
     
-    if status != .authorized {
-      print("❌ [SimpleRecorder] 마이크 권한 없음")
+    // 1. 마이크 권한 확인
+    let status = AVCaptureDevice.authorizationStatus(for: .audio)
+    print("🔐 [RealTime] 마이크 권한 상태: \(status.rawValue)")
+    
+    guard status == .authorized else {
+      print("❌ [RealTime] 마이크 권한 없음")
       result(FlutterError(code: "PERMISSION_DENIED", message: "Microphone permission required", details: nil))
       return
     }
     
-    guard let url = recordingURL else {
-      result(FlutterError(code: "NO_URL", message: "Recording URL not set", details: nil))
+    guard let engine = audioEngine, let input = inputNode else {
+      print("❌ [RealTime] 오디오 엔진 초기화 실패")
+      result(FlutterError(code: "ENGINE_NOT_READY", message: "Audio engine not ready", details: nil))
       return
     }
     
-    // macOS 기본 설정 사용
-    let settings: [String: Any] = [:]
+    if isRecording {
+      print("⚠️ [RealTime] 이미 녹음 중")
+      result(true)
+      return
+    }
     
     do {
-      // 기존 파일 삭제
-      if FileManager.default.fileExists(atPath: url.path) {
-        try FileManager.default.removeItem(at: url)
-        print("🗑️ [SimpleRecorder] 기존 파일 삭제")
+      // 2. 샘플 배열 초기화
+      recordedSamples.removeAll()
+      recordingStartTime = Date()
+      
+      // 3. 입력 포맷 확인
+      let inputFormat = input.outputFormat(forBus: 0)
+      print("🎛️ [RealTime] 입력 포맷: \(inputFormat.sampleRate)Hz, \(inputFormat.channelCount)채널")
+      
+      // 4. 실시간 오디오 처리 탭 설치
+      input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, when in
+        self?.processAudioBuffer(buffer: buffer)
       }
       
-      audioRecorder = try AVAudioRecorder(url: url, settings: settings)
-      audioRecorder?.delegate = nil
-      audioRecorder?.isMeteringEnabled = true
+      // 5. 오디오 엔진 시작
+      try engine.start()
+      isRecording = true
       
-      guard audioRecorder?.prepareToRecord() == true else {
-        print("❌ [SimpleRecorder] prepareToRecord 실패")
-        result(FlutterError(code: "PREPARE_FAILED", message: "Failed to prepare recording", details: nil))
-        return
-      }
+      print("✅ [RealTime] 실시간 녹음 시작 성공!")
+      print("📊 [RealTime] 엔진 실행 상태: \(engine.isRunning)")
       
-      let success = audioRecorder?.record() ?? false
+      result(true)
       
-      if success {
-        print("✅ [SimpleRecorder] 실제 마이크 녹음 시작")
-        print("📁 [SimpleRecorder] 녹음 파일: \(url.path)")
-        
-        // 0.5초 후에 메터링 확인
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-          self.audioRecorder?.updateMeters()
-          let level = self.audioRecorder?.averagePower(forChannel: 0) ?? -999
-          print("🎙️ [SimpleRecorder] 오디오 레벨 확인: \(level) dB")
-        }
-        
-        result(true)
-      } else {
-        print("❌ [SimpleRecorder] record() 호출 실패")
-        // AVAudioRecorder 상태 확인
-        if let recorder = audioRecorder {
-          print("📊 [SimpleRecorder] 상태: isRecording=\(recorder.isRecording), url=\(recorder.url)")
-          print("📊 [SimpleRecorder] settings=\(recorder.settings)")
-        }
-        result(FlutterError(code: "RECORD_FAILED", message: "Failed to start recording", details: nil))
-      }
     } catch {
-      print("❌ [SimpleRecorder] 녹음 초기화 실패: \(error)")
-      result(FlutterError(code: "RECORD_ERROR", message: error.localizedDescription, details: nil))
+      print("❌ [RealTime] 녹음 시작 실패: \(error)")
+      result(FlutterError(code: "START_FAILED", message: error.localizedDescription, details: nil))
+    }
+  }
+  
+  private func processAudioBuffer(buffer: AVAudioPCMBuffer) {
+    let frameLength = Int(buffer.frameLength)
+    let channelCount = Int(buffer.format.channelCount)
+    
+    // 멀티채널 오디오를 모노로 다운믹스
+    if channelCount == 1 {
+      // 모노 오디오: 직접 사용
+      guard let channelData = buffer.floatChannelData?[0] else { return }
+      for i in 0..<frameLength {
+        recordedSamples.append(channelData[i])
+      }
+    } else {
+      // 스테레오/멀티채널 오디오: 평균으로 다운믹스
+      guard let leftChannel = buffer.floatChannelData?[0],
+            let rightChannel = buffer.floatChannelData?[1] else { return }
+      
+      for i in 0..<frameLength {
+        let monoSample = (leftChannel[i] + rightChannel[i]) * 0.5  // L+R 평균
+        recordedSamples.append(monoSample)
+      }
+      
+      print("📊 [RealTime] 스테레오→모노 다운믹스: \(channelCount)채널 → 1채널")
+    }
+    
+    // RMS 레벨 계산 (최근 추가된 샘플들로)
+    let recentSampleCount = min(frameLength, recordedSamples.count)
+    let startIndex = max(0, recordedSamples.count - recentSampleCount)
+    
+    var sum: Float = 0.0
+    for i in startIndex..<recordedSamples.count {
+      sum += recordedSamples[i] * recordedSamples[i]
+    }
+    let rms = sqrt(sum / Float(recentSampleCount))
+    let dbLevel = 20 * log10(max(rms, 0.000001))  // dB 변환
+    
+    // 실시간으로 레벨을 Flutter로 전송
+    DispatchQueue.main.async {
+      // 너무 자주 호출되지 않도록 샘플링
+      if self.recordedSamples.count % 4410 == 0 { // 0.1초마다
+        print("📊 [RealTime] 레벨: \(String(format: "%.1f", dbLevel))dB, 샘플: \(self.recordedSamples.count)")
+        
+        // Flutter로 오디오 레벨 전송
+        self.channel?.invokeMethod("onAudioLevel", arguments: [
+          "level": Double(dbLevel),
+          "rms": Double(rms),
+          "samples": self.recordedSamples.count
+        ])
+      }
     }
   }
   
   func stopRecording(result: @escaping FlutterResult) {
-    audioRecorder?.stop()
-    audioRecorder = nil
-    print("✅ [SimpleRecorder] 녹음 중지")
-    result(true)
-  }
-  
-  func playRecording(result: @escaping FlutterResult) {
-    // 임시: 재생은 시뮬레이션만 하고 성공 반환
-    print("🔊 [SimpleRecorder] 재생 시뮬레이션")
+    print("🛑 [RealTime] 녹음 중지 요청")
     
-    // 3초 후에 자동 중지되도록 시뮬레이션
-    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-      print("⏸️ [SimpleRecorder] 재생 완료 시뮬레이션")
-    }
-    
-    result(true)
-  }
-  
-  func getDummyAudioData(result: @escaping FlutterResult) {
-    guard let url = recordingURL else {
-      print("❌ [SimpleRecorder] 녹음 파일 URL이 없음")
-      result(FlutterError(code: "NO_FILE", message: "No recording file", details: nil))
+    guard let engine = audioEngine, let input = inputNode else {
+      result(false)
       return
     }
     
-    // 파일이 존재하는지 확인
-    if !FileManager.default.fileExists(atPath: url.path) {
-      print("❌ [SimpleRecorder] 녹음 파일이 존재하지 않음: \(url.path)")
-      result(FlutterError(code: "FILE_NOT_FOUND", message: "Recording file not found", details: nil))
+    if !isRecording {
+      print("⚠️ [RealTime] 녹음 중이 아님")
+      result(true)
       return
     }
     
-    // 파일 크기 확인
-    do {
-      let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-      let fileSize = attributes[.size] as? Int64 ?? 0
-      print("📁 [SimpleRecorder] 녹음 파일 크기: \(fileSize) bytes")
-      
-      if fileSize == 0 {
-        print("⚠️ [SimpleRecorder] 파일이 비어있음, 더미 데이터 반환")
-        let dummyData = (0..<44100).map { i in
-          Float(sin(Double(i) * 0.01) * 0.5)
-        }
-        result(dummyData)
-        return
-      }
-      
-      // 실제 오디오 데이터를 읽어서 반환
-      let audioFile = try AVAudioFile(forReading: url)
-      let frameCount = Int(audioFile.length)
-      
-      guard let buffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat, frameCapacity: AVAudioFrameCount(frameCount)) else {
-        print("❌ [SimpleRecorder] 오디오 버퍼 생성 실패")
-        result(FlutterError(code: "BUFFER_ERROR", message: "Failed to create audio buffer", details: nil))
-        return
-      }
-      
-      try audioFile.read(into: buffer)
-      
-      // Float 배열로 변환
-      var audioData: [Float] = []
-      if let channelData = buffer.floatChannelData?[0] {
-        for i in 0..<Int(buffer.frameLength) {
-          audioData.append(channelData[i])
-        }
-      }
-      
-      print("📊 [SimpleRecorder] 실제 오디오 데이터 추출: \(audioData.count) 샘플")
-      result(audioData)
-      
-    } catch {
-      print("❌ [SimpleRecorder] 오디오 파일 읽기 실패: \(error)")
-      // 실패시 더미 데이터 반환
+    // 탭 제거
+    input.removeTap(onBus: 0)
+    
+    // 엔진 중지
+    if engine.isRunning {
+      engine.stop()
+    }
+    
+    isRecording = false
+    
+    let duration = recordingStartTime?.timeIntervalSinceNow ?? 0
+    print("✅ [RealTime] 녹음 중지 완료")
+    print("📊 [RealTime] 총 샘플: \(recordedSamples.count), 시간: \(String(format: "%.1f", abs(duration)))초")
+    
+    result(true)
+  }
+  
+  func getRecordedAudio(result: @escaping FlutterResult) {
+    print("📁 [RealTime] 녹음 데이터 요청")
+    print("📊 [RealTime] 저장된 샘플 수: \(recordedSamples.count)")
+    
+    if recordedSamples.isEmpty {
+      print("⚠️ [RealTime] 녹음된 데이터 없음, 더미 데이터 반환")
       let dummyData = (0..<44100).map { i in
         Float(sin(Double(i) * 0.01) * 0.5)
       }
       result(dummyData)
+    } else {
+      print("✅ [RealTime] 실제 녹음 데이터 반환: \(recordedSamples.count) 샘플")
+      result(recordedSamples)
+    }
+  }
+  
+  func playRecording(result: @escaping FlutterResult) {
+    print("🔊 [RealTime] 실제 오디오 재생 요청")
+    
+    guard !recordedSamples.isEmpty else {
+      print("❌ [RealTime] 재생할 오디오 데이터 없음")
+      result(false)
+      return
+    }
+    
+    // 녹음된 Float 배열을 임시 오디오 파일로 변환
+    do {
+      let tempURL = createTempAudioFile(samples: recordedSamples)
+      
+      // AVAudioPlayer로 재생
+      audioPlayer = try AVAudioPlayer(contentsOf: tempURL)
+      audioPlayer?.delegate = self
+      audioPlayer?.prepareToPlay()
+      
+      if audioPlayer?.play() == true {
+        print("✅ [RealTime] 실제 오디오 재생 시작 - 길이: \(String(format: "%.1f", audioPlayer?.duration ?? 0))초")
+        
+        // 재생 완료를 모니터링
+        playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+          guard let player = self?.audioPlayer else {
+            self?.playbackTimer?.invalidate()
+            return
+          }
+          
+          if !player.isPlaying {
+            self?.playbackTimer?.invalidate()
+            print("⏸️ [RealTime] 재생 완료")
+            
+            // 임시 파일 삭제
+            try? FileManager.default.removeItem(at: tempURL)
+          }
+        }
+        
+        result(true)
+      } else {
+        print("❌ [RealTime] 오디오 재생 시작 실패")
+        result(false)
+      }
+      
+    } catch {
+      print("❌ [RealTime] 오디오 재생 실패: \(error)")
+      result(false)
+    }
+  }
+  
+  private func createTempAudioFile(samples: [Float]) -> URL {
+    let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    let tempURL = documentsPath.appendingPathComponent("temp_playback.wav")
+    
+    // 실제 녹음된 샘플레이트와 동일하게 설정 (48kHz)
+    let sampleRate: Double = 48000.0  // 녹음과 동일한 48kHz로 변경
+    let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)!
+    
+    do {
+      let audioFile = try AVAudioFile(forWriting: tempURL, settings: format.settings)
+      
+      guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else {
+        print("❌ [RealTime] 버퍼 생성 실패")
+        return tempURL
+      }
+      
+      // Float 샘플을 버퍼에 복사
+      let channelData = buffer.floatChannelData![0]
+      for i in 0..<samples.count {
+        channelData[i] = samples[i]
+      }
+      buffer.frameLength = AVAudioFrameCount(samples.count)
+      
+      try audioFile.write(from: buffer)
+      print("📁 [RealTime] 임시 재생 파일 생성: \(samples.count) 샘플 -> \(tempURL.lastPathComponent)")
+      
+    } catch {
+      print("❌ [RealTime] 임시 파일 생성 실패: \(error)")
+    }
+    
+    return tempURL
+  }
+  
+  // MARK: - AVAudioPlayerDelegate
+  func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+    print("🔊 [RealTime] 재생 완료됨: successfully=\(flag)")
+    playbackTimer?.invalidate()
+    playbackTimer = nil
+  }
+  
+  func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+    if let error = error {
+      print("❌ [RealTime] 재생 디코드 오류: \(error)")
     }
   }
 }
 
 class MainFlutterWindow: NSWindow {
-  private var simpleRecorder: SimpleAudioRecorder?
+  private var audioRecorder: RealTimeAudioRecorder?
   
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -186,22 +293,18 @@ class MainFlutterWindow: NSWindow {
     
     switch status {
     case .authorized:
-      print("✅ macOS 마이크 권한 이미 허용됨")
+      print("✅ [Main] macOS 마이크 권한 허용됨")
     case .notDetermined:
-      print("🔔 macOS 마이크 권한 요청 중...")
+      print("🔔 [Main] macOS 마이크 권한 요청 중...")
       AVCaptureDevice.requestAccess(for: .audio) { granted in
         DispatchQueue.main.async {
-          if granted {
-            print("✅ macOS 마이크 권한 허용됨!")
-          } else {
-            print("❌ macOS 마이크 권한 거부됨")
-          }
+          print(granted ? "✅ [Main] 마이크 권한 허용됨!" : "❌ [Main] 마이크 권한 거부됨")
         }
       }
     case .denied, .restricted:
-      print("❌ macOS 마이크 권한이 거부되었습니다. 시스템 환경설정에서 변경하세요.")
+      print("❌ [Main] 마이크 권한이 거부되었습니다.")
     @unknown default:
-      print("⚠️ 알 수 없는 마이크 권한 상태")
+      print("⚠️ [Main] 알 수 없는 권한 상태")
     }
   }
   
@@ -211,10 +314,10 @@ class MainFlutterWindow: NSWindow {
       binaryMessenger: controller.engine.binaryMessenger
     )
     
-    simpleRecorder = SimpleAudioRecorder(channel: channel)
+    audioRecorder = RealTimeAudioRecorder(channel: channel)
     
     channel.setMethodCallHandler { [weak self] (call, result) in
-      guard let recorder = self?.simpleRecorder else {
+      guard let recorder = self?.audioRecorder else {
         result(FlutterError(code: "NO_RECORDER", message: "Recorder not initialized", details: nil))
         return
       }
@@ -225,7 +328,7 @@ class MainFlutterWindow: NSWindow {
       case "stopRecording":
         recorder.stopRecording(result: result)
       case "getRecordedAudio":
-        recorder.getDummyAudioData(result: result)
+        recorder.getRecordedAudio(result: result)
       case "playAudio":
         recorder.playRecording(result: result)
       case "pauseAudio":
@@ -239,6 +342,6 @@ class MainFlutterWindow: NSWindow {
       }
     }
     
-    print("✅ [MainWindow] 간단한 오디오 채널 설정 완료")
+    print("✅ [Main] 실시간 오디오 시스템 설정 완료")
   }
 }

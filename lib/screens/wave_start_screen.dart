@@ -52,12 +52,15 @@ class _WaveStartScreenState extends State<WaveStartScreen>
     _backgroundController.repeat();
   }
 
-  void _initializeAudioService() {
+  void _initializeAudioService() async {
+    // 네이티브 오디오 서비스 초기화
+    await _audioService.initialize();
+    
     // 오디오 레벨 콜백 설정
     _audioService.onAudioLevelChanged = (level) {
       if (mounted) {
         setState(() {
-          _audioLevel = level;
+          _audioLevel = level * 10.0; // 시각화를 위해 증폭
         });
       }
     };

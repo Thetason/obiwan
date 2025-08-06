@@ -151,18 +151,23 @@ class NativeAudioService {
       
       switch (call.method) {
         case 'onAudioLevel':
-          // Float로 직접 전달되는 RMS 값 처리
-          final rms = (call.arguments as num).toDouble();
+          // Map으로 전달되는 오디오 레벨 데이터 처리
+          final Map<String, dynamic> levelData = Map<String, dynamic>.from(call.arguments as Map);
           
-          print('🔊 [Dart] 오디오 레벨 수신: RMS = ${rms.toStringAsFixed(3)}');
+          final dbLevel = (levelData['level'] as num?)?.toDouble() ?? -60.0;
+          final rms = (levelData['rms'] as num?)?.toDouble() ?? 0.0;
+          final samples = (levelData['samples'] as num?)?.toInt() ?? 0;
           
-          // 콜백 호출
+          print('🔊 [Dart] 실시간 오디오: ${dbLevel.toStringAsFixed(1)}dB, RMS=${rms.toStringAsFixed(3)}, 샘플=${samples}');
+          
+          // RMS 값으로 콜백 호출
           onAudioLevelChanged?.call(rms);
           
-          // 스트림으로도 전송 (호환성)
+          // 전체 데이터를 스트림으로 전송
           _audioLevelController?.add({
-            'level': rms,
+            'level': dbLevel,
             'rms': rms,
+            'samples': samples.toDouble(),
           });
           
           return 'success';
