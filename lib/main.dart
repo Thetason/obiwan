@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/enhanced_home_screen.dart';
 import 'screens/fixed_vocal_training_screen.dart';
+import 'screens/wave_start_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,7 +65,8 @@ class VocalTrainerApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
-        '/': (context) => const EnhancedHomeScreen(),
+        '/': (context) => const WaveStartScreen(),
+        '/home': (context) => const EnhancedHomeScreen(),
         '/training': (context) => const FixedVocalTrainingScreen(),
       },
       debugShowCheckedModeBanner: false,
