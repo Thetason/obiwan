@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import '../widgets/wave_visualizer_widget.dart';
+import '../widgets/advanced_pitch_visualizer.dart';
 import '../services/dual_engine_service.dart';
 import '../widgets/audio_player_widget.dart';
 import '../services/native_audio_service.dart';
+import '../models/analysis_result.dart';
+import '../utils/pitch_color_system.dart';
+import '../utils/vibrato_analyzer.dart';
 import 'fixed_vocal_training_screen.dart';
 
 class WaveStartScreen extends StatefulWidget {
@@ -18,19 +23,28 @@ class _WaveStartScreenState extends State<WaveStartScreen>
   // 서비스 및 상태 관리
   final DualEngineService _engineService = DualEngineService();
   final NativeAudioService _audioService = NativeAudioService.instance;
+  final VibratoAnalyzer _vibratoAnalyzer = VibratoAnalyzer();
+  final BreathingAnalyzer _breathingAnalyzer = BreathingAnalyzer();
+  
   bool _isRecording = false;
   double _audioLevel = 0.0;
   TouchState _touchState = TouchState.idle;
   List<double>? _recordedAudioData;
   
+  // 고급 시각화를 위한 새로운 상태들
+  final List<PitchData> _pitchHistory = [];
+  PitchData? _currentPitch;
+  VibratoResult _currentVibrato = const VibratoResult.none();
+  BreathingResult _currentBreathing = const BreathingResult.insufficient();
+  
   // 애니메이션 컨트롤러
   late AnimationController _backgroundController;
   late Animation<double> _backgroundAnimation;
   
-  // 색상 테마
-  final Color _primaryColor = const Color(0xFF6366F1);
-  final Color _secondaryColor = const Color(0xFF8B5CF6);
-  final Color _accentColor = const Color(0xFF10B981);
+  // 색상 테마 - 밝고 친근한 톤
+  final Color _primaryColor = const Color(0xFF5B8DEE);
+  final Color _secondaryColor = const Color(0xFF9C88FF);
+  final Color _accentColor = const Color(0xFF00BFA6);
 
   @override
   void initState() {
@@ -62,6 +76,11 @@ class _WaveStartScreenState extends State<WaveStartScreen>
         setState(() {
           _audioLevel = level * 10.0; // 시각화를 위해 증폭
         });
+        
+        // 실시간 피치 분석 (시뮬레이션 - 실제로는 CREPE/SPICE 결과 사용)
+        if (_isRecording && level > 0.01) {
+          _simulateRealtimePitch(level);
+        }
       }
     };
     print('🎵 오디오 서비스 초기화 완료');
@@ -146,15 +165,18 @@ class _WaveStartScreenState extends State<WaveStartScreen>
     Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => Scaffold(
-          backgroundColor: const Color(0xFF0F0F23),
+          backgroundColor: const Color(0xFFF5F5F7),
           body: SafeArea(
             child: AudioPlayerWidget(
               audioData: audioData,
               duration: duration,
-              onAnalyze: () {
+              onAnalyze: (DualResult? analysisResult) {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => const FixedVocalTrainingScreen(),
+                    builder: (context) => FixedVocalTrainingScreen(
+                      analysisResult: analysisResult,
+                      audioData: audioData,
+                    ),
                   ),
                 );
               },
@@ -176,9 +198,47 @@ class _WaveStartScreenState extends State<WaveStartScreen>
     );
   }
 
+  /// 실시간 피치 시뮬레이션 (오디오 레벨 기반)
+  void _simulateRealtimePitch(double level) {
+    // 실제로는 CREPE/SPICE 서버에서 받은 데이터를 사용
+    // 여기서는 오디오 레벨을 기반으로 시뮬레이션
+    
+    final now = DateTime.now();
+    final baseFreq = 220.0 + (level * 200.0); // A3 ~ A4 범위
+    final confidence = (level * 2.0).clamp(0.0, 1.0);
+    
+    // 약간의 랜덤 변화로 자연스러운 피치 변동 시뮬레이션
+    final randomOffset = (DateTime.now().millisecondsSinceEpoch % 1000) / 1000.0;
+    final frequency = baseFreq + (math.sin(randomOffset * math.pi * 2) * 20);
+    
+    final pitchData = PitchData(
+      frequency: frequency,
+      confidence: confidence,
+      cents: (math.sin(randomOffset * math.pi * 4) * 15), // ±15 cents 변동
+      timestamp: now,
+      amplitude: level,
+    );
+    
+    // 피치 히스토리 업데이트
+    _pitchHistory.add(pitchData);
+    if (_pitchHistory.length > 50) {
+      _pitchHistory.removeAt(0); // 최대 50개 유지
+    }
+    
+    // 현재 피치 업데이트
+    _currentPitch = pitchData;
+    
+    // 비브라토 분석
+    _currentVibrato = _vibratoAnalyzer.analyzeVibrato(pitchData);
+    
+    // 호흡법 분석 
+    _currentBreathing = _breathingAnalyzer.analyzeBreathing(_pitchHistory);
+  }
+
   @override
   void dispose() {
     _backgroundController.dispose();
+    _vibratoAnalyzer.clearHistory();
     super.dispose();
   }
 
@@ -196,7 +256,7 @@ class _WaveStartScreenState extends State<WaveStartScreen>
                   // 상단 제목 영역
                   _buildHeader(),
                   
-                  // 메인 웨이브 비주얼라이저 영역
+                  // 메인 도플러 웨이브 비주얼라이저 영역
                   Expanded(
                     child: Center(
                       child: WaveVisualizerWidget(
@@ -229,18 +289,18 @@ class _WaveStartScreenState extends State<WaveStartScreen>
         end: Alignment.bottomRight,
         colors: [
           Color.lerp(
-            const Color(0xFF0F0F23),
-            const Color(0xFF1A1B23),
+            const Color(0xFFF5F5F7),
+            const Color(0xFFFFFFFF),
             animationValue,
           )!,
           Color.lerp(
-            const Color(0xFF1A1B23),
-            const Color(0xFF0F1419),
+            const Color(0xFFFFFFFF),
+            const Color(0xFFF8F9FA),
             animationValue,
           )!,
           Color.lerp(
-            const Color(0xFF0F1419),
-            const Color(0xFF0F0F23),
+            const Color(0xFFF8F9FA),
+            const Color(0xFFF5F5F7),
             animationValue,
           )!,
         ],
@@ -290,13 +350,7 @@ class _WaveStartScreenState extends State<WaveStartScreen>
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
-              shadows: [
-                Shadow(
-                  color: _primaryColor.withOpacity(0.5),
-                  blurRadius: 10,
-                ),
-              ],
+              color: const Color(0xFF1D1D1F),
             ),
           ),
           
@@ -307,7 +361,7 @@ class _WaveStartScreenState extends State<WaveStartScreen>
             'AI Vocal Training Assistant',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.white.withOpacity(0.8),
+              color: Color(0xFF1D1D1F).withOpacity(0.7),
               fontWeight: FontWeight.w300,
               letterSpacing: 1.0,
             ),
@@ -326,12 +380,19 @@ class _WaveStartScreenState extends State<WaveStartScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: _accentColor.withOpacity(0.3),
                 width: 1,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -345,7 +406,7 @@ class _WaveStartScreenState extends State<WaveStartScreen>
                 Text(
                   '웨이브를 터치하고 홀드하여 음성을 녹음하세요',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Color(0xFF1D1D1F).withOpacity(0.8),
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                   ),
@@ -361,7 +422,7 @@ class _WaveStartScreenState extends State<WaveStartScreen>
             'CREPE + SPICE 듀얼 AI 엔진이\n실시간으로 당신의 목소리를 분석합니다',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Color(0xFF1D1D1F).withOpacity(0.6),
               fontSize: 12,
               height: 1.4,
             ),

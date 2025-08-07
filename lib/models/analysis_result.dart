@@ -105,6 +105,7 @@ class DualResult extends AnalysisResult {
   final SpiceResult? spiceResult;
   final String recommendedEngine;
   final double analysisQuality;
+  final double? timeSeconds; // 시간별 분석용
   
   DualResult({
     required super.frequency,
@@ -114,6 +115,7 @@ class DualResult extends AnalysisResult {
     this.spiceResult,
     required this.recommendedEngine,
     required this.analysisQuality,
+    this.timeSeconds, // 선택적 시간 정보
   }) : super(engine: 'FUSED');
   
   bool get hasCrepe => crepeResult != null;

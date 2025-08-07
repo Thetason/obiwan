@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:math' as math;
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../models/analysis_result.dart';
@@ -20,14 +21,14 @@ class DualEngineService {
   DualEngineService._internal() {
     _crepeClient = Dio(BaseOptions(
       baseUrl: _crepeUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 60),
     ));
     
     _spiceClient = Dio(BaseOptions(
       baseUrl: _spiceUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 60),
     ));
   }
   
@@ -56,12 +57,19 @@ class DualEngineService {
   /// CREPE 단일 분석
   Future<CrepeResult?> analyzeWithCrepe(Float32List audioData) async {
     try {
+      // Float32List를 안전한 Base64로 인코딩
+      final audioBase64 = _encodeAudioToBase64(audioData);
+      
       final response = await _crepeClient.post('/analyze', data: {
-        'audio': audioData.toList(),
+        'audio_base64': audioBase64,
+        'sample_rate': 48000,
+        'encoding': 'base64_float32'
       });
       
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        return CrepeResult.fromJson(response.data['data']);
+      if (response.statusCode == 200 && _isValidJsonResponse(response.data)) {
+        if (response.data['success'] == true) {
+          return CrepeResult.fromJson(response.data['data']);
+        }
       }
       return null;
     } catch (e) {
@@ -73,12 +81,19 @@ class DualEngineService {
   /// SPICE 단일 분석
   Future<SpiceResult?> analyzeWithSpice(Float32List audioData) async {
     try {
+      // Float32List를 안전한 Base64로 인코딩
+      final audioBase64 = _encodeAudioToBase64(audioData);
+      
       final response = await _spiceClient.post('/analyze', data: {
-        'audio': audioData.toList(),
+        'audio_base64': audioBase64,
+        'sample_rate': 48000,
+        'encoding': 'base64_float32'
       });
       
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        return SpiceResult.fromJson(response.data['data']);
+      if (response.statusCode == 200 && _isValidJsonResponse(response.data)) {
+        if (response.data['success'] == true) {
+          return SpiceResult.fromJson(response.data['data']);
+        }
       }
       return null;
     } catch (e) {
@@ -87,6 +102,58 @@ class DualEngineService {
     }
   }
   
+  /// 시간별 피치 분석 (청크 단위)
+  Future<List<DualResult>> analyzeTimeBasedPitch(Float32List audioData, {
+    int windowSize = 2048,
+    int hopSize = 512,
+    double sampleRate = 48000.0,
+  }) async {
+    final results = <DualResult>[];
+    
+    if (audioData.length < windowSize) {
+      return results;
+    }
+    
+    final numWindows = (audioData.length - windowSize) ~/ hopSize + 1;
+    print('🎵 [DualEngine] 시간별 분석 시작: $numWindows개 윈도우');
+    
+    for (int i = 0; i < numWindows; i++) {
+      final startIdx = i * hopSize;
+      final endIdx = math.min(startIdx + windowSize, audioData.length);
+      
+      if (endIdx - startIdx < windowSize) break;
+      
+      final chunk = Float32List.fromList(
+        audioData.sublist(startIdx, endIdx)
+      );
+      
+      final timeSeconds = startIdx / sampleRate;
+      
+      try {
+        final result = await analyzeDual(chunk);
+        if (result != null) {
+          // 시간 정보 추가
+          final timedResult = DualResult(
+            frequency: result.frequency,
+            confidence: result.confidence,
+            timestamp: result.timestamp,
+            crepeResult: result.crepeResult,
+            spiceResult: result.spiceResult,
+            recommendedEngine: result.recommendedEngine,
+            analysisQuality: result.analysisQuality,
+            timeSeconds: timeSeconds, // 시간 정보 추가
+          );
+          results.add(timedResult);
+        }
+      } catch (e) {
+        print('⚠️ [DualEngine] 청크 $i 분석 실패: $e');
+      }
+    }
+    
+    print('✅ [DualEngine] 시간별 분석 완료: ${results.length}개 결과');
+    return results;
+  }
+
   /// 듀얼 엔진 분석 (자동 선택)
   Future<DualResult?> analyzeDual(Float32List audioData) async {
     // 오디오 복잡도 판단
@@ -139,6 +206,48 @@ class DualEngineService {
       }
     }
     return crossings / data.length;
+  }
+  
+  /// Float32List를 안전한 Base64로 인코딩
+  String _encodeAudioToBase64(Float32List audioData) {
+    try {
+      // Float32를 바이트 배열로 변환
+      final byteData = ByteData(audioData.length * 4);
+      for (int i = 0; i < audioData.length; i++) {
+        byteData.setFloat32(i * 4, audioData[i], Endian.little);
+      }
+      
+      // Base64로 인코딩
+      final bytes = byteData.buffer.asUint8List();
+      return base64Encode(bytes);
+    } catch (e) {
+      debugPrint('Audio encoding failed: $e');
+      rethrow;
+    }
+  }
+  
+  /// JSON 응답 안전성 검증
+  bool _isValidJsonResponse(Map<String, dynamic> data) {
+    try {
+      // 필수 필드 확인
+      if (!data.containsKey('success') || !data.containsKey('data')) {
+        return false;
+      }
+      
+      // 데이터 타입 검증
+      final success = data['success'];
+      if (success is! bool) return false;
+      
+      // 성공 응답인 경우 데이터 필드 검증
+      if (success && data['data'] == null) {
+        return false;
+      }
+      
+      return true;
+    } catch (e) {
+      debugPrint('JSON validation failed: $e');
+      return false;
+    }
   }
   
   /// 결과 융합

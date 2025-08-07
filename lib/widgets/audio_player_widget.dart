@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import '../services/native_audio_service.dart';
+import '../services/dual_engine_service.dart';
+import '../models/analysis_result.dart';
 
 class AudioPlayerWidget extends StatefulWidget {
   final List<double> audioData;
@@ -8,7 +11,7 @@ class AudioPlayerWidget extends StatefulWidget {
   final VoidCallback? onPlay;
   final VoidCallback? onPause;
   final VoidCallback? onStop;
-  final VoidCallback? onAnalyze; // 분석하기 버튼 콜백
+  final Function(DualResult?)? onAnalyze; // 분석 결과와 함께 호출
   final VoidCallback? onReRecord; // 다시 녹음 콜백
 
   const AudioPlayerWidget({
@@ -34,6 +37,12 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
   late AnimationController _playController;
   late Animation<double> _playAnimation;
   final NativeAudioService _nativeAudioService = NativeAudioService.instance;
+  
+  // AI 분석 관련
+  final DualEngineService _dualEngine = DualEngineService();
+  bool _isAnalyzing = false;
+  DualResult? _analysisResult;
+  String _analysisStatus = '분석 준비 중...';
 
   @override
   void initState() {
@@ -47,6 +56,131 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
     _playAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _playController, curve: Curves.easeInOut),
     );
+    
+    // 위젯 로드 시 백그라운드 AI 분석 시작
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startBackgroundAnalysis();
+    });
+  }
+
+  /// 백그라운드 AI 분석 시작
+  void _startBackgroundAnalysis() async {
+    if (_isAnalyzing) return;
+    
+    setState(() {
+      _isAnalyzing = true;
+      _analysisStatus = 'CREPE + SPICE 엔진 분석 중...';
+    });
+    
+    try {
+      // List<double>를 Float32List로 변환
+      final audioFloat32 = Float32List.fromList(widget.audioData);
+      
+      // 엔진 상태 확인
+      setState(() {
+        _analysisStatus = '엔진 상태 확인 중...';
+      });
+      
+      final status = await _dualEngine.checkStatus();
+      print('🤖 [AI] 엔진 상태: ${status.statusText}');
+      
+      if (!status.anyHealthy) {
+        setState(() {
+          _analysisStatus = 'AI 서버 오프라인 - 로컬 분석 모드';
+          _isAnalyzing = false;
+        });
+        _performLocalAnalysis(audioFloat32);
+        return;
+      }
+      
+      // 듀얼 엔진 분석 실행
+      setState(() {
+        _analysisStatus = '듀얼 엔진 보컬 분석 중...';
+      });
+      
+      final result = await _dualEngine.analyzeDual(audioFloat32);
+      
+      if (mounted) {
+        setState(() {
+          _analysisResult = result;
+          _isAnalyzing = false;
+          if (result != null) {
+            _analysisStatus = '분석 완료! (${result.recommendedEngine})';
+          } else {
+            _analysisStatus = '분석 실패 - 로컬 모드';
+            _performLocalAnalysis(audioFloat32);
+          }
+        });
+      }
+      
+    } catch (e) {
+      print('❌ [AI] 분석 오류: $e');
+      if (mounted) {
+        setState(() {
+          _analysisStatus = '오류 발생 - 로컬 분석으로 전환';
+          _isAnalyzing = false;
+        });
+        _performLocalAnalysis(Float32List.fromList(widget.audioData));
+      }
+    }
+  }
+  
+  /// 로컬 분석 (AI 서버 없을 때 대안)
+  void _performLocalAnalysis(Float32List audioData) {
+    // 간단한 로컬 피치 분석
+    final sampleRate = 48000.0;
+    final windowSize = 2048;
+    final frequencies = <double>[];
+    
+    for (int i = 0; i < audioData.length - windowSize; i += windowSize ~/ 2) {
+      final window = audioData.sublist(i, i + windowSize);
+      final freq = _estimatePitch(window, sampleRate);
+      if (freq > 80 && freq < 2000) { // 일반적인 보컬 범위
+        frequencies.add(freq);
+      }
+    }
+    
+    if (frequencies.isNotEmpty) {
+      final avgFreq = frequencies.reduce((a, b) => a + b) / frequencies.length;
+      final confidence = math.min(1.0, frequencies.length / 100.0);
+      
+      // 로컬 결과 생성
+      final localResult = DualResult(
+        frequency: avgFreq,
+        confidence: confidence,
+        timestamp: DateTime.now(),
+        crepeResult: null,
+        spiceResult: null,
+        recommendedEngine: 'Local',
+        analysisQuality: confidence * 0.7,
+      );
+      
+      setState(() {
+        _analysisResult = localResult;
+        _analysisStatus = '로컬 분석 완료 (${avgFreq.toStringAsFixed(1)} Hz)';
+      });
+    }
+  }
+  
+  /// 간단한 피치 추정 (FFT 없이)
+  double _estimatePitch(List<double> window, double sampleRate) {
+    // Autocorrelation 기반 간단한 피치 추정
+    final length = window.length;
+    double maxCorr = 0.0;
+    int bestLag = 0;
+    
+    for (int lag = 20; lag < length ~/ 3; lag++) {
+      double corr = 0.0;
+      for (int i = 0; i < length - lag; i++) {
+        corr += window[i] * window[i + lag];
+      }
+      if (corr > maxCorr) {
+        maxCorr = corr;
+        bestLag = lag;
+      }
+    }
+    
+    return bestLag > 0 ? sampleRate / bestLag : 0.0;
   }
 
   @override
@@ -119,8 +253,15 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFE5E5EA), // iOS 회색 배경
+        color: Colors.white, // 밝은 배경
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -128,7 +269,12 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
           // 헤더
           _buildHeader(),
           
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          
+          // AI 분석 상태 표시
+          _buildAnalysisStatus(),
+          
+          const SizedBox(height: 16),
           
           // 웨이브폼 시각화
           _buildWaveform(),
@@ -498,8 +644,18 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
           // 완료 버튼 (파란색)
           GestureDetector(
             onTap: () {
-              // 완료 - AI 분석 시작
-              widget.onAnalyze?.call();
+              // 분석이 완료되었거나 로컬 분석이라도 있으면 진행
+              if (_analysisResult != null || !_isAnalyzing) {
+                widget.onAnalyze?.call(_analysisResult);
+              } else {
+                // 분석 중이면 잠시 기다리라는 메시지
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('AI 분석이 완료될 때까지 잠시 기다려 주세요...'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -508,7 +664,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                '완료',
+                _isAnalyzing ? 'AI 분석 중...' : (_analysisResult != null ? 'AI 분석 완료' : '완료'),
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 16,
@@ -613,5 +769,89 @@ class WaveformPainter extends CustomPainter {
   bool shouldRepaint(covariant WaveformPainter oldDelegate) {
     return currentPosition != oldDelegate.currentPosition ||
            audioData != oldDelegate.audioData;
+  }
+}
+
+extension on _AudioPlayerWidgetState {
+  /// AI 분석 상태 UI
+  Widget _buildAnalysisStatus() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: _isAnalyzing 
+            ? const Color(0xFF007AFF).withOpacity(0.1)
+            : (_analysisResult != null 
+                ? const Color(0xFF34C759).withOpacity(0.1)
+                : Colors.orange.withOpacity(0.1)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _isAnalyzing 
+              ? const Color(0xFF007AFF).withOpacity(0.3)
+              : (_analysisResult != null 
+                  ? const Color(0xFF34C759).withOpacity(0.3)
+                  : Colors.orange.withOpacity(0.3)),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // 분석 상태 아이콘
+          _isAnalyzing 
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF007AFF),
+                  ),
+                )
+              : Icon(
+                  _analysisResult != null ? Icons.check_circle : Icons.info_outline,
+                  color: _analysisResult != null 
+                      ? const Color(0xFF34C759)
+                      : Colors.orange,
+                  size: 16,
+                ),
+          
+          const SizedBox(width: 12),
+          
+          // 분석 상태 텍스트
+          Expanded(
+            child: Text(
+              _analysisStatus,
+              style: TextStyle(
+                fontSize: 14,
+                color: _isAnalyzing 
+                    ? const Color(0xFF007AFF)
+                    : (_analysisResult != null 
+                        ? const Color(0xFF34C759)
+                        : Colors.orange[700]),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          
+          // 분석 결과 미리보기 (완료시에만)
+          if (_analysisResult != null && !_isAnalyzing) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF34C759).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${_analysisResult!.frequency.toStringAsFixed(1)} Hz',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF34C759),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
