@@ -3,7 +3,7 @@
 ## 🎯 **Claude에게 즉시 전달할 메시지**
 
 ```
-안녕! 오비완 v2 프로젝트를 이어서 개발하자.
+안녕! 오비완 v3 프로젝트를 이어서 개발하자.
 
 프로젝트 위치: /Users/seoyeongbin/vocal_trainer_ai
 
@@ -35,10 +35,10 @@
 
 ## 🎤 **프로젝트 핵심 정보**
 
-- **이름**: Obi-wan v2 - AI Vocal Training Assistant
-- **상태**: 완전 작동하는 macOS 네이티브 앱
-- **기능**: CREPE + SPICE 듀얼 AI로 실시간 보컬 분석
-- **특징**: Apple Voice Memos 스타일 UI, 48kHz 고품질 오디오
+- **이름**: Obi-wan v3 - AI Vocal Training Assistant
+- **상태**: JSON 에러 해결 + 밝은 UI로 완전 작동하는 macOS 앱
+- **기능**: CREPE + SPICE Base64 인코딩으로 안정적 AI 분석
+- **특징**: 밝고 친근한 Apple 스타일 UI, 48kHz 고품질 오디오
 
 ---
 
@@ -61,4 +61,4 @@ curl http://localhost:5003/health
 
 ---
 
-**🔥 이 파일을 Claude에게 보여주면 즉시 프로젝트를 이어갈 수 있습니다!**
+**🔥 이 파일을 Claude에게 보여주면 오비완 v3를 즉시 이어갈 수 있습니다!**
