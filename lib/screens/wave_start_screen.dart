@@ -9,6 +9,9 @@ import '../models/analysis_result.dart';
 import '../utils/pitch_color_system.dart';
 import '../utils/vibrato_analyzer.dart';
 import 'fixed_vocal_training_screen.dart';
+import 'vanido_style_training_screen.dart';
+import 'realtime_pitch_tracker_screen.dart';
+import 'realtime_pitch_tracker_v2.dart';
 
 class WaveStartScreen extends StatefulWidget {
   const WaveStartScreen({super.key});
@@ -170,11 +173,20 @@ class _WaveStartScreenState extends State<WaveStartScreen>
             child: AudioPlayerWidget(
               audioData: audioData,
               duration: duration,
-              onAnalyze: (DualResult? analysisResult) {
+              onAnalyze: (List<DualResult>? timeBasedResults) {
+                // 시간별 분석 결과에서 대표값 추출 (첫 번째 또는 가장 신뢰도 높은 것)
+                DualResult? representativeResult;
+                if (timeBasedResults != null && timeBasedResults.isNotEmpty) {
+                  // 신뢰도가 가장 높은 결과 선택
+                  representativeResult = timeBasedResults.reduce((a, b) => 
+                    a.confidence > b.confidence ? a : b);
+                }
+                
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => FixedVocalTrainingScreen(
-                      analysisResult: analysisResult,
+                    builder: (context) => VanidoStyleTrainingScreen(
+                      analysisResult: representativeResult,
+                      timeBasedResults: timeBasedResults, // 시간별 결과도 전달
                       audioData: audioData,
                     ),
                   ),
@@ -256,6 +268,31 @@ class _WaveStartScreenState extends State<WaveStartScreen>
                   // 상단 제목 영역
                   _buildHeader(),
                   
+                  // 실시간 피치 트래커 버튼
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RealtimePitchTrackerV2(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.graphic_eq),
+                      label: const Text('실시간 피치 트래커'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
+                  ),
+                  
                   // 메인 도플러 웨이브 비주얼라이저 영역
                   Expanded(
                     child: Center(
@@ -318,6 +355,44 @@ class _WaveStartScreenState extends State<WaveStartScreen>
       padding: const EdgeInsets.all(24.0),
       child: Column(
         children: [
+          // 상단 버튼들
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const SizedBox(width: 48), // 좌측 여백
+              
+              // 테스트 버튼
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/pitch_test');
+                  },
+                  icon: Icon(
+                    Icons.tune,
+                    color: _primaryColor,
+                    size: 24,
+                  ),
+                  tooltip: '피치 테스트',
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 20),
+          
           // 앱 아이콘
           Container(
             width: 60,

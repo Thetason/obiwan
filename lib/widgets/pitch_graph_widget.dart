@@ -329,6 +329,8 @@ class PitchGraphPainter extends CustomPainter {
     final noteNames = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'];
     
     final frequencies = pitchData.map((p) => p.frequency).toList();
+    if (frequencies.isEmpty) return;
+    
     final minFreq = frequencies.reduce(math.min);
     final maxFreq = frequencies.reduce(math.max);
     double freqRange = maxFreq - minFreq;
@@ -383,6 +385,8 @@ class PitchGraphPainter extends CustomPainter {
     if (pitchData.length < 2) return;
 
     final frequencies = pitchData.map((p) => p.frequency).toList();
+    if (frequencies.isEmpty) return;
+    
     final minFreq = frequencies.reduce(math.min);
     final maxFreq = frequencies.reduce(math.max);
     final freqRange = maxFreq - minFreq;
@@ -398,6 +402,9 @@ class PitchGraphPainter extends CustomPainter {
     final minTime = pitchData.first.timeSeconds;
     final maxTime = pitchData.last.timeSeconds;
     final timeRange = maxTime - minTime;
+    
+    // 시간 범위가 0이면 그리지 않음
+    if (timeRange <= 0) return;
 
     final path = Path();
     final gradientPath = Path();
@@ -473,9 +480,12 @@ class PitchGraphPainter extends CustomPainter {
 
   void _drawPitchCurveWithRange(Canvas canvas, Size size, Paint paint, double minFreq, double maxFreq) {
     final freqRange = maxFreq - minFreq;
+    if (freqRange <= 0) return;
+    
     final minTime = pitchData.first.timeSeconds;
     final maxTime = pitchData.last.timeSeconds;
     final timeRange = maxTime - minTime;
+    if (timeRange <= 0) return;
 
     final path = Path();
     final gradientPath = Path();

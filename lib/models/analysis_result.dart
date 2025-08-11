@@ -107,16 +107,29 @@ class DualResult extends AnalysisResult {
   final double analysisQuality;
   final double? timeSeconds; // 시간별 분석용
   
+  // SinglePitchTracker 결과 추가
+  final String? noteName;
+  final double? cents;
+  final bool? isAccurate;
+  final double? latencyMs;
+  
   DualResult({
     required super.frequency,
     required super.confidence,
     required super.timestamp,
     this.crepeResult,
     this.spiceResult,
-    required this.recommendedEngine,
-    required this.analysisQuality,
+    String? recommendedEngine,
+    double? analysisQuality,
     this.timeSeconds, // 선택적 시간 정보
-  }) : super(engine: 'FUSED');
+    // SinglePitchTracker 결과
+    this.noteName,
+    this.cents,
+    this.isAccurate,
+    this.latencyMs,
+  }) : recommendedEngine = recommendedEngine ?? 'UNKNOWN',
+       analysisQuality = analysisQuality ?? 0.0,
+       super(engine: 'FUSED');
   
   bool get hasCrepe => crepeResult != null;
   bool get hasSpice => spiceResult != null;

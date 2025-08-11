@@ -11,7 +11,7 @@ class AudioPlayerWidget extends StatefulWidget {
   final VoidCallback? onPlay;
   final VoidCallback? onPause;
   final VoidCallback? onStop;
-  final Function(DualResult?)? onAnalyze; // 분석 결과와 함께 호출
+  final Function(List<DualResult>?)? onAnalyze; // 시간별 분석 결과와 함께 호출
   final VoidCallback? onReRecord; // 다시 녹음 콜백
 
   const AudioPlayerWidget({
@@ -41,7 +41,9 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
   // AI 분석 관련
   final DualEngineService _dualEngine = DualEngineService();
   bool _isAnalyzing = false;
+  bool _isTimeBasedAnalyzing = false;
   DualResult? _analysisResult;
+  List<DualResult>? _timeBasedResults;
   String _analysisStatus = '분석 준비 중...';
 
   @override
@@ -181,6 +183,84 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
     }
     
     return bestLag > 0 ? sampleRate / bestLag : 0.0;
+  }
+  
+  /// 시간별 피치 분석 (AI 보컬 분석 시작 버튼용)
+  Future<void> _performTimeBasedAnalysis() async {
+    if (_isTimeBasedAnalyzing) return;
+    
+    print('🔍 [AudioPlayer] 시간별 분석 시작');
+    print('🔍 [AudioPlayer] 오디오 데이터 크기: ${widget.audioData.length} 샘플');
+    
+    setState(() {
+      _isTimeBasedAnalyzing = true;
+      _analysisStatus = '시간별 피치 분석 중...';
+    });
+    
+    try {
+      // List<double>를 Float32List로 변환
+      final audioFloat32 = Float32List.fromList(widget.audioData);
+      print('🔍 [AudioPlayer] Float32List 변환 완료: ${audioFloat32.length} 샘플');
+      
+      // 엔진 상태 확인
+      setState(() {
+        _analysisStatus = 'CREPE + SPICE 엔진 상태 확인...';
+      });
+      
+      final status = await _dualEngine.checkStatus();
+      print('🤖 [AudioPlayer] 엔진 상태: ${status.statusText}');
+      
+      if (!status.anyHealthy) {
+        print('❌ [AudioPlayer] AI 서버 오프라인');
+        setState(() {
+          _analysisStatus = 'AI 서버 오프라인 - 시간별 분석 불가';
+          _isTimeBasedAnalyzing = false;
+        });
+        return;
+      }
+      
+      // 시간별 피치 분석 실행 (타임아웃 설정)
+      setState(() {
+        _analysisStatus = '🎯 고정밀 단일 음정 분석 중... (SinglePitchTracker)';
+      });
+      
+      print('🎯 [AudioPlayer] SinglePitchTracker 분석 시작 - 오디오 길이: ${audioFloat32.length} 샘플');
+      
+      // SinglePitchTracker를 사용한 고정밀 단일 음정 분석
+      final timeBasedResults = await _dualEngine.analyzeSinglePitchAccurate(
+        audioFloat32,
+        windowSize: 24000,  // 0.5초 분량 (더 정확한 분석)
+        hopSize: 6000,      // 0.125초 간격
+        sampleRate: 48000.0,
+      );
+      
+      print('🎯 [AudioPlayer] SinglePitchTracker 분석 완료! 결과: ${timeBasedResults.length}개');
+      
+      print('🔍 [AudioPlayer] 분석 결과: ${timeBasedResults.length}개');
+      
+      if (mounted) {
+        setState(() {
+          _timeBasedResults = timeBasedResults;
+          _isTimeBasedAnalyzing = false;
+          if (timeBasedResults.isNotEmpty) {
+            _analysisStatus = '🎯 고정밀 단일 음정 분석 완료! (${timeBasedResults.length}개 구간)';
+            print('✅ [AudioPlayer] SinglePitchTracker 분석 성공: ${timeBasedResults.length}개 결과');
+          } else {
+            _analysisStatus = '시간별 분석 실패 - 데이터 부족';
+            print('⚠️ [AudioPlayer] 시간별 분석 실패 - 결과 없음');
+          }
+        });
+      }
+      
+    } catch (e) {
+      print('❌ [TimeBasedAnalysis] 분석 오류: $e');
+      if (mounted) {
+        setState(() {
+          _analysisStatus = '시간별 분석 오류: $e';
+          _isTimeBasedAnalyzing = false;
+        });
+      }
+    }
   }
 
   @override
@@ -641,20 +721,70 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
             ),
           ),
           
-          // 완료 버튼 (파란색)
+          // 완료 버튼 (파란색) - 시간별 분석 시작
           GestureDetector(
-            onTap: () {
-              // 분석이 완료되었거나 로컬 분석이라도 있으면 진행
-              if (_analysisResult != null || !_isAnalyzing) {
-                widget.onAnalyze?.call(_analysisResult);
-              } else {
-                // 분석 중이면 잠시 기다리라는 메시지
+            onTap: () async {
+              print('🔵 [AudioPlayer] AI 분석 버튼 클릭');
+              
+              // CREPE 분석을 기다리고 완료된 후 다음 단계로 진행
+              if (_timeBasedResults == null && !_isTimeBasedAnalyzing) {
+                print('🔵 [AudioPlayer] CREPE 분석 시작 - 완료까지 대기');
+                
+                // 분석 진행 상태 UI 업데이트
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('AI 분석이 완료될 때까지 잠시 기다려 주세요...'),
-                    duration: Duration(seconds: 2),
+                    content: Text('CREPE AI 분석 중... 잠시만 기다려주세요'),
+                    duration: Duration(seconds: 8),
                   ),
                 );
+                
+                // CREPE 분석을 실제로 기다림
+                await _performTimeBasedAnalysis();
+                
+                // 분석 완료 후 결과 전달
+                if (_timeBasedResults != null && _timeBasedResults!.isNotEmpty) {
+                  print('✅ [AudioPlayer] CREPE 분석 완료 - 결과 전달: ${_timeBasedResults!.length}개');
+                  widget.onAnalyze?.call(_timeBasedResults!);
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('CREPE 분석 완료! ${_timeBasedResults!.length}개 구간 분석됨'),
+                      duration: const Duration(seconds: 2),
+                      backgroundColor: const Color(0xFF34C759),
+                    ),
+                  );
+                } else {
+                  print('❌ [AudioPlayer] CREPE 분석 실패 - 기본 결과로 진행');
+                  // 기본 분석 결과라도 전달
+                  final fallbackResult = _analysisResult != null ? [_analysisResult!] : <DualResult>[];
+                  widget.onAnalyze?.call(fallbackResult);
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('CREPE 분석 실패 - 기본 분석으로 진행'),
+                      duration: Duration(seconds: 2),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+                
+              } else if (_timeBasedResults != null && !_isTimeBasedAnalyzing) {
+                print('🔵 [AudioPlayer] 기존 CREPE 분석 결과 사용: ${_timeBasedResults!.length}개');
+                widget.onAnalyze?.call(_timeBasedResults!);
+              } else if (_isTimeBasedAnalyzing) {
+                print('🔵 [AudioPlayer] CREPE 분석 진행 중 - 완료까지 대기');
+                
+                // 이미 진행 중인 분석 완료까지 대기
+                while (_isTimeBasedAnalyzing && mounted) {
+                  await Future.delayed(const Duration(milliseconds: 500));
+                }
+                
+                if (_timeBasedResults != null && _timeBasedResults!.isNotEmpty) {
+                  widget.onAnalyze?.call(_timeBasedResults!);
+                } else {
+                  final fallbackResult = _analysisResult != null ? [_analysisResult!] : <DualResult>[];
+                  widget.onAnalyze?.call(fallbackResult);
+                }
               }
             },
             child: Container(
@@ -664,7 +794,11 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                _isAnalyzing ? 'AI 분석 중...' : (_analysisResult != null ? 'AI 분석 완료' : '완료'),
+                _isTimeBasedAnalyzing 
+                    ? 'CREPE 분석 중...' 
+                    : (_timeBasedResults != null 
+                        ? '보컬 트레이닝 시작 ✅' 
+                        : 'CREPE AI 분석 시작'),
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 16,
@@ -695,7 +829,7 @@ class WaveformPainter extends CustomPainter {
       return;
     }
     
-    print('📊 [WaveformPainter] 오디오 데이터 길이: ${audioData.length}, 캔버스 크기: ${size.width}x${size.height}');
+    // print('📊 [WaveformPainter] 오디오 데이터 길이: ${audioData.length}, 캔버스 크기: ${size.width}x${size.height}');
 
     final paint = Paint()
       ..strokeWidth = 2.0
@@ -706,7 +840,7 @@ class WaveformPainter extends CustomPainter {
     final double barWidth = size.width / numBars;
     final int samplesPerBar = (audioData.length / numBars).ceil();
     
-    print('📊 [WaveformPainter] 바 개수: $numBars, 바당 샘플: $samplesPerBar');
+    // print('📊 [WaveformPainter] 바 개수: $numBars, 바당 샘플: $samplesPerBar');
 
     // 오디오 데이터를 다운샘플링하여 웨이브폼 생성
     for (int i = 0; i < numBars; i++) {
@@ -796,7 +930,7 @@ extension on _AudioPlayerWidgetState {
       child: Row(
         children: [
           // 분석 상태 아이콘
-          _isAnalyzing 
+          (_isAnalyzing || _isTimeBasedAnalyzing) 
               ? const SizedBox(
                   width: 16,
                   height: 16,
@@ -806,8 +940,8 @@ extension on _AudioPlayerWidgetState {
                   ),
                 )
               : Icon(
-                  _analysisResult != null ? Icons.check_circle : Icons.info_outline,
-                  color: _analysisResult != null 
+                  (_analysisResult != null || _timeBasedResults != null) ? Icons.check_circle : Icons.info_outline,
+                  color: (_analysisResult != null || _timeBasedResults != null) 
                       ? const Color(0xFF34C759)
                       : Colors.orange,
                   size: 16,
@@ -821,9 +955,9 @@ extension on _AudioPlayerWidgetState {
               _analysisStatus,
               style: TextStyle(
                 fontSize: 14,
-                color: _isAnalyzing 
+                color: (_isAnalyzing || _isTimeBasedAnalyzing) 
                     ? const Color(0xFF007AFF)
-                    : (_analysisResult != null 
+                    : ((_analysisResult != null || _timeBasedResults != null) 
                         ? const Color(0xFF34C759)
                         : Colors.orange[700]),
                 fontWeight: FontWeight.w500,
@@ -832,7 +966,24 @@ extension on _AudioPlayerWidgetState {
           ),
           
           // 분석 결과 미리보기 (완료시에만)
-          if (_analysisResult != null && !_isAnalyzing) ...[
+          if (_timeBasedResults != null && !_isTimeBasedAnalyzing) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF34C759).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${_timeBasedResults!.length}개 구간',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF34C759),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ] else if (_analysisResult != null && !_isAnalyzing && _timeBasedResults == null) ...[
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
