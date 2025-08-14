@@ -1,0 +1,24 @@
+{
+  "id": "20250813211608_Sam Smith",
+  "youtubeUrl": "https://youtu.be/example_91",
+  "artistName": "Sam Smith",
+  "songTitle": "Song 91",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "bright",
+  "pitchAccuracy": 75.0,
+  "breathSupport": 92.3,
+  "createdAt": "2025-08-13T21:16:08.042089",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 316.45036087010243,
+    "f2": 1652.2461141419133,
+    "singers_formant": 0.02665913013295984,
+    "spectral_centroid": 3589.993096428706,
+    "base_pitch": 245.51491395427308
+  },
+  "ai_confidence": 0.7,
+  "status": "medium_confidence"
+}

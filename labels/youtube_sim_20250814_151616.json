@@ -1,0 +1,68 @@
+[
+  {
+    "id": "yt_sim_1",
+    "timestamp": "2025-08-14T15:16:16.184878",
+    "source": {
+      "type": "youtube",
+      "url": "https://www.youtube.com/watch?v=YQHsXMglC9A",
+      "title": "Adele - Hello",
+      "artist": "Adele"
+    },
+    "analysis": {
+      "overall_quality": 5,
+      "vocal_technique": "belt",
+      "timbre": "bright",
+      "pitch_accuracy": 95,
+      "breath_support": 95
+    },
+    "confidence": {
+      "overall": 0.8,
+      "needs_review": false
+    },
+    "note": "시뮬레이션 데이터 - ffmpeg 설치 후 실제 분석 가능"
+  },
+  {
+    "id": "yt_sim_2",
+    "timestamp": "2025-08-14T15:16:16.184906",
+    "source": {
+      "type": "youtube",
+      "url": "https://www.youtube.com/watch?v=pB-5XG-DbAA",
+      "title": "Sam Smith - Stay With Me",
+      "artist": "Sam Smith"
+    },
+    "analysis": {
+      "overall_quality": 4,
+      "vocal_technique": "mix",
+      "timbre": "bright",
+      "pitch_accuracy": 93,
+      "breath_support": 92
+    },
+    "confidence": {
+      "overall": 0.8,
+      "needs_review": false
+    },
+    "note": "시뮬레이션 데이터 - ffmpeg 설치 후 실제 분석 가능"
+  },
+  {
+    "id": "yt_sim_3",
+    "timestamp": "2025-08-14T15:16:16.184917",
+    "source": {
+      "type": "youtube",
+      "url": "https://www.youtube.com/watch?v=ekzHIouo8Q4",
+      "title": "Bruno Mars - When I Was Your Man",
+      "artist": "Bruno Mars"
+    },
+    "analysis": {
+      "overall_quality": 4,
+      "vocal_technique": "chest",
+      "timbre": "warm",
+      "pitch_accuracy": 93,
+      "breath_support": 92
+    },
+    "confidence": {
+      "overall": 0.8,
+      "needs_review": false
+    },
+    "note": "시뮬레이션 데이터 - ffmpeg 설치 후 실제 분석 가능"
+  }
+]

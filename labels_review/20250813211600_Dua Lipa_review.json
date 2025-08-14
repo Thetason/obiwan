@@ -1,0 +1,24 @@
+{
+  "id": "20250813211600_Dua Lipa",
+  "youtubeUrl": "https://youtu.be/example_8",
+  "artistName": "Dua Lipa",
+  "songTitle": "Song 8",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "mix",
+  "tone": "warm",
+  "pitchAccuracy": 85.7,
+  "breathSupport": 93.7,
+  "createdAt": "2025-08-13T21:16:00.710031",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 506.34941451400414,
+    "f2": 1922.497950156146,
+    "singers_formant": 0.5082851530043443,
+    "spectral_centroid": 2110.9100017552173,
+    "base_pitch": 372.93599072659833
+  },
+  "ai_confidence": 0.7,
+  "status": "medium_confidence"
+}

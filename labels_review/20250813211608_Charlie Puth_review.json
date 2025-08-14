@@ -1,0 +1,28 @@
+{
+  "id": "20250813211608_Charlie Puth",
+  "youtubeUrl": "https://youtu.be/example_9",
+  "artistName": "Charlie Puth",
+  "songTitle": "Song 9",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "bright",
+  "pitchAccuracy": 74.3,
+  "breathSupport": 61.0,
+  "createdAt": "2025-08-13T21:16:08.018733",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 394.15028973126465,
+    "f2": 1954.3229477904292,
+    "singers_formant": 0.471836454237779,
+    "spectral_centroid": 3913.682919767231,
+    "base_pitch": 418.05688950420813
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함",
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

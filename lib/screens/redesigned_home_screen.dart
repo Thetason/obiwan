@@ -91,22 +91,26 @@ class _RedesignedHomeScreenState extends State<RedesignedHomeScreen>
                 
                 // 메인 컨텐츠 영역
                 Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // 샤잠 스타일 메인 버튼
-                      _buildMainButton(),
-                      
-                      const SizedBox(height: 40),
-                      
-                      // 호출 텍스트
-                      _buildCallToActionText(),
-                      
-                      const SizedBox(height: 60),
-                      
-                      // 빠른 실행 버튼들
-                      _buildQuickActions(),
-                    ],
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // 샤잠 스타일 메인 버튼
+                        _buildMainButton(),
+                        
+                        const SizedBox(height: 30),
+                        
+                        // 호출 텍스트
+                        _buildCallToActionText(),
+                        
+                        const SizedBox(height: 40),
+                        
+                        // 빠른 실행 버튼들
+                        _buildQuickActions(),
+                        
+                        const SizedBox(height: 20), // 하단 여백
+                      ],
+                    ),
                   ),
                 ),
               ],

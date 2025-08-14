@@ -1,0 +1,27 @@
+{
+  "id": "20250813211608_Billie Eilish",
+  "youtubeUrl": "https://youtu.be/example_95",
+  "artistName": "Billie Eilish",
+  "songTitle": "Song 95",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "belt",
+  "tone": "warm",
+  "pitchAccuracy": 71.1,
+  "breathSupport": 93.2,
+  "createdAt": "2025-08-13T21:16:08.042993",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 309.59815764769394,
+    "f2": 1518.5213064160673,
+    "singers_formant": 0.9976503613625273,
+    "spectral_centroid": 1959.3896473237646,
+    "base_pitch": 411.4612448829922
+  },
+  "uncertain_aspects": [
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.7,
+  "status": "medium_confidence"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "20250813211600_Adele",
+  "youtubeUrl": "https://youtu.be/example_2",
+  "artistName": "Adele",
+  "songTitle": "Song 2",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "mix",
+  "tone": "warm",
+  "pitchAccuracy": 84.9,
+  "breathSupport": 87.1,
+  "createdAt": "2025-08-13T21:16:00.708490",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 508.96601535541856,
+    "f2": 1360.5817349540418,
+    "singers_formant": 0.37356032368144654,
+    "spectral_centroid": 2035.0858893800648,
+    "base_pitch": 408.97641231017826
+  },
+  "ai_confidence": 0.7,
+  "status": "medium_confidence"
+}

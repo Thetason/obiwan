@@ -1,0 +1,24 @@
+{
+  "id": "20250813211608_Harry Styles",
+  "youtubeUrl": "https://youtu.be/example_89",
+  "artistName": "Harry Styles",
+  "songTitle": "Song 89",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "mix",
+  "tone": "bright",
+  "pitchAccuracy": 96.7,
+  "breathSupport": 92.4,
+  "createdAt": "2025-08-13T21:16:08.041673",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 562.0754933996118,
+    "f2": 1896.980103120708,
+    "singers_formant": 0.530036204941486,
+    "spectral_centroid": 3609.350396806246,
+    "base_pitch": 497.94020625657174
+  },
+  "ai_confidence": 0.7999999999999999,
+  "status": "medium_confidence"
+}

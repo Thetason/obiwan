@@ -1,0 +1,24 @@
+{
+  "id": "20250813211600_The Weeknd",
+  "youtubeUrl": "https://youtu.be/example_7",
+  "artistName": "The Weeknd",
+  "songTitle": "Song 7",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "mix",
+  "tone": "warm",
+  "pitchAccuracy": 82.3,
+  "breathSupport": 95.6,
+  "createdAt": "2025-08-13T21:16:00.709778",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 370.73614222977346,
+    "f2": 1284.5133528946694,
+    "singers_formant": 0.4776661441702338,
+    "spectral_centroid": 2430.4924903306737,
+    "base_pitch": 459.3062848817801
+  },
+  "ai_confidence": 0.7,
+  "status": "medium_confidence"
+}

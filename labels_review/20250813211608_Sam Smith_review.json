@@ -1,0 +1,27 @@
+{
+  "id": "20250813211608_Sam Smith",
+  "youtubeUrl": "https://youtu.be/example_1",
+  "artistName": "Sam Smith",
+  "songTitle": "Song 1",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "belt",
+  "tone": "bright",
+  "pitchAccuracy": 78.3,
+  "breathSupport": 94.4,
+  "createdAt": "2025-08-13T21:16:08.016642",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 302.66443668850434,
+    "f2": 1538.9256969802343,
+    "singers_formant": 0.7003295766691198,
+    "spectral_centroid": 3502.490308746437,
+    "base_pitch": 274.7379045777502
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

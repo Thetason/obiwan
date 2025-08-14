@@ -1,0 +1,24 @@
+{
+  "id": "20250813211600_Doja Cat",
+  "youtubeUrl": "https://youtu.be/example_90",
+  "artistName": "Doja Cat",
+  "songTitle": "Song 90",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "mix",
+  "tone": "neutral",
+  "pitchAccuracy": 92.1,
+  "breathSupport": 74.1,
+  "createdAt": "2025-08-13T21:16:00.730689",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 587.083870152081,
+    "f2": 1685.2779957847843,
+    "singers_formant": 0.00852343430960878,
+    "spectral_centroid": 2895.7738495215845,
+    "base_pitch": 385.5333977805729
+  },
+  "ai_confidence": 0.8999999999999999,
+  "status": "high_confidence"
+}

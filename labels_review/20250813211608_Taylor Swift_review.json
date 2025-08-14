@@ -1,0 +1,28 @@
+{
+  "id": "20250813211608_Taylor Swift",
+  "youtubeUrl": "https://youtu.be/example_41",
+  "artistName": "Taylor Swift",
+  "songTitle": "Song 41",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "neutral",
+  "pitchAccuracy": 71.4,
+  "breathSupport": 61.4,
+  "createdAt": "2025-08-13T21:16:08.030482",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 355.3516223498251,
+    "f2": 1208.2382317808137,
+    "singers_formant": 0.27800299099826375,
+    "spectral_centroid": 3189.637357809065,
+    "base_pitch": 454.0840863871516
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함",
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

@@ -1,0 +1,28 @@
+{
+  "id": "20250813211600_Billie Eilish",
+  "youtubeUrl": "https://youtu.be/example_35",
+  "artistName": "Billie Eilish",
+  "songTitle": "Song 35",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "belt",
+  "tone": "bright",
+  "pitchAccuracy": 70.3,
+  "breathSupport": 61.2,
+  "createdAt": "2025-08-13T21:16:00.717133",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 393.4159378055969,
+    "f2": 1751.5268674382487,
+    "singers_formant": 0.7072373123877549,
+    "spectral_centroid": 3633.2134941034888,
+    "base_pitch": 322.5641285116827
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함",
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

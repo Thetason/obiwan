@@ -7,6 +7,7 @@ import '../services/native_audio_service.dart';
 import '../services/dual_engine_service.dart';
 import '../services/sound_feedback_service.dart';
 import '../services/timbre_analysis_service.dart';
+import '../services/bach_temperament_service.dart';
 import '../theme/pitch_colors.dart';
 import 'playback_visualizer.dart';
 import 'realtime_pitch_graph.dart';
@@ -44,6 +45,7 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
   int _currentPitchIndex = 0;
   double _currentFrequency = 0.0;
   double _currentConfidence = 0.0;
+  double _currentPlaybackTime = 0.0;
   
   // 서비스
   final NativeAudioService _audioService = NativeAudioService.instance;
@@ -97,9 +99,6 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
   
   @override
   void dispose() {
-    // CRITICAL FIX: dispose 플래그 설정으로 추가 작업 방지
-    if (!mounted) return;
-    
     print('🔄 [RecordingFlow] dispose 시작');
     
     // 모든 타이머 즉시 취소
@@ -108,10 +107,6 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
     _waveformTimer?.cancel();
     _waveformTimer = null;
     
-    // 애니메이션 컨트롤러 정리
-    _recordingPulseController.dispose();
-    _waveformController.dispose();
-    
     // CRITICAL FIX: 오디오 서비스 안전 정리 (비동기 처리)
     _cleanupAudioServices();
     
@@ -119,6 +114,10 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
     _recordedAudioData = null;
     _pitchData.clear();
     _realtimeWaveform.clear();
+    
+    // 애니메이션 컨트롤러 정리 (마지막에 수행)
+    _recordingPulseController.dispose();
+    _waveformController.dispose();
     
     print('✅ [RecordingFlow] dispose 완료');
     super.dispose();
@@ -168,24 +167,25 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
           timer.cancel();
           return;
         }
-        setState(() {
-          _recordingTime += 0.1;
-          
-          // 실제 오디오 레벨 가져와서 웨이브폼 표시
-          _audioService.getCurrentAudioLevel().then((level) {
-            if (mounted) {
-              _realtimeWaveform.add(level);
-              if (_realtimeWaveform.length > 50) {
-                _realtimeWaveform.removeAt(0);
-              }
+        
+        _recordingTime += 0.1;
+        
+        // 실제 오디오 레벨 가져와서 웨이브폼 표시
+        _audioService.getCurrentAudioLevel().then((level) {
+          if (!mounted) return;
+          setState(() {
+            _realtimeWaveform.add(level);
+            if (_realtimeWaveform.length > 50) {
+              _realtimeWaveform.removeAt(0);
             }
-          }).catchError((e) {
-            // 오디오 레벨을 못 가져오면 최소값 사용
-            if (mounted) {
-              _realtimeWaveform.add(0.1);
-              if (_realtimeWaveform.length > 50) {
-                _realtimeWaveform.removeAt(0);
-              }
+          });
+        }).catchError((e) {
+          // 오디오 레벨을 못 가져오면 최소값 사용
+          if (!mounted) return;
+          setState(() {
+            _realtimeWaveform.add(0.1);
+            if (_realtimeWaveform.length > 50) {
+              _realtimeWaveform.removeAt(0);
             }
           });
         });
@@ -269,8 +269,51 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
       
       print('🎵 오디오 분석 시작: ${audioData.length} 샘플');
       
+      // 오디오 데이터 통계 출력 (디버깅)
+      final maxVal = audioData.reduce((a, b) => a.abs() > b.abs() ? a : b);
+      final avgVal = audioData.reduce((a, b) => a + b) / audioData.length;
+      final rms = math.sqrt(audioData.map((x) => x * x).reduce((a, b) => a + b) / audioData.length);
+      
+      print('📊 오디오 통계:');
+      print('  - 최대값: ${maxVal.toStringAsFixed(6)}');
+      print('  - 평균값: ${avgVal.toStringAsFixed(6)}');
+      print('  - RMS: ${rms.toStringAsFixed(6)}');
+      print('  - 샘플레이트: 48000 Hz');
+      
+      // 첫 50개 샘플 출력
+      print('🔊 첫 50개 샘플:');
+      for (int i = 0; i < 50 && i < audioData.length; i += 5) {
+        print('  [$i-${i+4}]: ${audioData.sublist(i, math.min(i+5, audioData.length)).map((x) => x.toStringAsFixed(4)).join(", ")}');
+      }
+      
       // List<double>을 Float32List로 변환
       final float32Data = Float32List.fromList(audioData);
+      
+      // 디버깅: 첫 1초만 직접 CREPE로 테스트
+      if (float32Data.length > 48000) {
+        print('🧪 [DEBUG] 첫 1초 데이터로 직접 CREPE 테스트...');
+        final testChunk = Float32List.fromList(float32Data.sublist(0, 48000));
+        
+        try {
+          final directResult = await _engineService.analyzeWithCrepe(testChunk);
+          if (directResult != null) {
+            print('🎯 [DEBUG] 직접 CREPE 결과: ${directResult.frequency.toStringAsFixed(1)} Hz (신뢰도: ${directResult.confidence.toStringAsFixed(3)})');
+            
+            // 바흐 평균율 시스템으로 정밀 분석
+            final temperamentNote = BachTemperamentService.frequencyToTemperamentNote(directResult.frequency);
+            print('🎵 [DEBUG] 바흐 평균율 분석:');
+            print('  - 음표: ${temperamentNote.fullName}');
+            print('  - 독일식: ${temperamentNote.germanFullName}');
+            print('  - 정확도: ${temperamentNote.accuracy.toStringAsFixed(1)}%');
+            print('  - 센트 오차: ${temperamentNote.centsError.toStringAsFixed(1)}¢');
+            print('  - 레벨: ${temperamentNote.accuracyLevel}');
+          } else {
+            print('❌ [DEBUG] 직접 CREPE 분석 실패');
+          }
+        } catch (e) {
+          print('❌ [DEBUG] 직접 CREPE 오류: $e');
+        }
+      }
       
       // CREPE/SPICE 듀얼 엔진으로 시간별 피치 분석
       final pitchResults = await _engineService.analyzeTimeBasedPitch(float32Data);
@@ -318,63 +361,63 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
       _currentPitchIndex = 0;
       _waveformTimer?.cancel();  // 기존 타이머 취소
       
-      _waveformTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) async {
+      _waveformTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
         // CRITICAL FIX: mounted와 disposal 상태 체크
-        if (!mounted || _isDisposed()) {
+        if (!mounted) {
           timer.cancel();
           return;
         }
         
         final currentTime = timer.tick * 0.05;
         
+        // 현재 재생 시간 업데이트
+        if (mounted) {
+          setState(() {
+            _currentPlaybackTime = currentTime;
+          });
+        }
+        
         // 현재 시간에 해당하는 피치 데이터 찾기 (안전한 범위 체크)
-        if (_pitchData.isNotEmpty && _currentPitchIndex >= 0 && _currentPitchIndex < _pitchData.length) {
+        if (_pitchData.isNotEmpty && _currentPitchIndex < _pitchData.length) {
           final currentPitch = _pitchData[_currentPitchIndex];
           
           // 시간이 맞으면 UI 업데이트
           if (currentPitch.time <= currentTime) {
-            if (mounted && !_isDisposed()) {
-              try {
-                setState(() {
-                  _currentFrequency = currentPitch.frequency;
-                  _currentConfidence = currentPitch.confidence;
-                });
-                print('🎵 실시간 피치 업데이트: ${_currentFrequency.toStringAsFixed(1)}Hz');
-              } catch (e) {
-                print('⚠️ setState 실패: $e');
-              }
+            if (!mounted) {
+              timer.cancel();
+              return;
             }
             
-            // CRITICAL FIX: 사운드 피드백을 try-catch로 보호
+            setState(() {
+              _currentFrequency = currentPitch.frequency;
+              _currentConfidence = currentPitch.confidence;
+            });
+            
+            // 사운드 피드백 (비동기로 처리, 에러 무시)
             if (_currentConfidence > 0.7) {
-              try {
-                final accuracy = (_currentFrequency - 440).abs() < 50 ? 0.9 : 0.5;
-                await _soundService.playPitchFeedback(accuracy);
-              } catch (e) {
-                print('⚠️ 사운드 피드백 실패 (무시): $e');
-              }
+              final accuracy = (_currentFrequency - 440).abs() < 50 ? 0.9 : 0.5;
+              _soundService.playPitchFeedback(accuracy).catchError((e) {
+                // 에러 무시
+              });
             }
             
             _currentPitchIndex++;
           }
         }
         
-        // CRITICAL FIX: 재생 완료 처리
+        // 재생 완료 처리
         if (currentTime > _recordingTime) {
           timer.cancel();
+          _waveformTimer = null;
           
-          if (mounted && !_isDisposed()) {
-            try {
-              await _audioService.stopAudio();
-            } catch (e) {
-              print('⚠️ 오디오 정지 실패 (무시): $e');
-            }
-            
-            if (mounted) {
-              _showResults();
-            }
-          }
-          return;
+          if (!mounted) return;
+          
+          // 오디오 정지 (비동기로 처리)
+          _audioService.stopAudio().catchError((e) {
+            // 에러 무시
+          });
+          
+          _showResults();
         }
       });
       
@@ -384,16 +427,13 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
     }
   }
   
-  // CRITICAL FIX: disposal 상태 확인 메소드
-  bool _isDisposed() {
-    return !mounted || _recordingTimer == null && _waveformTimer == null;
-  }
   
   void _showResults() {
     if (!mounted) return;
     setState(() {
       _isPlaying = false;
       _currentStep = FlowStep.results;
+      _currentPlaybackTime = 0.0;
       
       // 실제 분석 결과 계산
       if (_pitchData.isNotEmpty) {
@@ -437,6 +477,18 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
     });
   }
   
+  String _frequencyToNote(double frequency) {
+    if (frequency <= 0) return '';
+    
+    const double a4 = 440.0;
+    final double semitones = 12 * math.log(frequency / a4) / math.ln2;
+    final int noteIndex = (semitones.round() + 9) % 12;  // A=9
+    final int octave = 4 + ((semitones.round() + 9) ~/ 12);
+    
+    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    return '${notes[noteIndex]}$octave';
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -469,10 +521,14 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
           const SizedBox(width: 40),
           Text(
             _getStepTitle(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: _currentStep == FlowStep.analysis 
+                  ? PitchColors.electricBlue
+                  : Colors.white,
+              fontFamily: 'SF Pro Display',
+              letterSpacing: 1.5,
             ),
           ),
           IconButton(
@@ -487,13 +543,13 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
   String _getStepTitle() {
     switch (_currentStep) {
       case FlowStep.recording:
-        return '녹음 중';
+        return 'RECORDING';
       case FlowStep.playback:
-        return '녹음 확인';
+        return 'PLAYBACK';
       case FlowStep.analysis:
-        return '실시간 분석';
+        return 'LIVE ANALYSIS';
       case FlowStep.results:
-        return '분석 결과';
+        return 'RESULTS';
     }
   }
   
@@ -709,226 +765,149 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
   }
   
   Widget _buildAnalysisStep() {
-    // 정확도 계산
+    // Nike-style accuracy calculation
     final accuracy = _currentFrequency > 0 && _currentFrequency < 500 
-        ? (_currentFrequency - 440).abs() < 50 ? 0.9 
+        ? ((_currentFrequency - 440).abs() < 50 ? 0.9 
         : (_currentFrequency - 440).abs() < 100 ? 0.7 
-        : 0.5
+        : 0.5)
         : 0.0;
     
     return Container(
       key: const ValueKey('analysis'),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            PitchColors.backgroundDark,
-            PitchColors.backgroundDark.withOpacity(0.95),
-          ],
-        ),
+        gradient: PitchColors.nikeBackground(),
       ),
-      child: Stack(
-        children: [
-          // 3차 레이어: 배경 웨이브폼
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.2,
-              child: CustomPaint(
-                painter: _WaveformBackgroundPainter(
-                  waveform: _realtimeWaveform,
-                  color: PitchColors.neutral,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Nike-style compact metrics header
+              Container(
+                height: 60,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      PitchColors.cardDark.withOpacity(0.8),
+                      PitchColors.cardAccent.withOpacity(0.6),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: PitchColors.electricBlue.withOpacity(0.3),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildNikeMetric(
+                      'FREQUENCY',
+                      '${_currentFrequency.toStringAsFixed(1)}',
+                      'Hz',
+                      PitchColors.electricBlue,
+                    ),
+                    _buildNikeMetric(
+                      'ACCURACY',
+                      '${(accuracy * 100).toStringAsFixed(0)}',
+                      '%',
+                      PitchColors.fromAccuracy(accuracy),
+                    ),
+                    _buildNikeMetric(
+                      'PROGRESS',
+                      '${_currentPitchIndex}',
+                      '/${_pitchData.length}',
+                      Colors.white70,
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-          
-          // 2차 레이어: 피치 트래킹
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                // Vanido 스타일 피치 막대
-                PitchBarVisualizer(
+              
+              const SizedBox(height: 24),
+              
+              // HERO ELEMENT: Nike-style pitch graph (70% of screen)
+              Expanded(
+                flex: 7,
+                child: _pitchData.isNotEmpty 
+                  ? RealtimePitchGraph(
+                      pitchData: _pitchData,
+                      isPlaying: _isPlaying,
+                      currentTime: _currentPlaybackTime,
+                    )
+                  : Container(
+                      decoration: BoxDecoration(
+                        gradient: PitchColors.nikeBackground(),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: PitchColors.electricBlue.withOpacity(0.3),
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    PitchColors.electricBlue,
+                                    PitchColors.neonGreen,
+                                  ],
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.analytics_outlined,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              'ANALYZING PITCH',
+                              style: TextStyle(
+                                color: PitchColors.electricBlue,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'SF Pro Display',
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${_pitchData.length} DATA POINTS',
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // BOTTOM: Compact Nike-style pitch bar (20% height)
+              Expanded(
+                flex: 2,
+                child: PitchBarVisualizer(
                   currentPitch: _currentFrequency,
-                  targetPitch: 440.0, // A4 목표
+                  targetPitch: 440.0,
                   confidence: _currentConfidence,
                   isActive: _isPlaying,
                 ),
-                
-                const SizedBox(height: 20),
-                
-                // 메인 시각화 영역
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: PitchColors.fromAccuracy(accuracy).withOpacity(0.5),
-                        width: 2,
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: RealtimeVisualFeedback(
-                        currentFrequency: _currentFrequency,
-                        targetFrequency: 440.0,
-                        audioLevel: _currentConfidence,
-                        isActive: _isPlaying,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          
-          // 1차 레이어: 핵심 정보
-          Positioned(
-            top: 40,
-            left: 24,
-            right: 24,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: PitchColors.cardDark.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: PitchColors.fromAccuracy(accuracy).withOpacity(0.3),
-                    blurRadius: 10,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildInfoItem(
-                    '진행',
-                    '${_currentPitchIndex}/${_pitchData.length}',
-                    Colors.white70,
-                  ),
-                  _buildInfoItem(
-                    '음정',
-                    '${_currentFrequency.toStringAsFixed(1)}Hz',
-                    PitchColors.fromAccuracy(accuracy),
-                  ),
-                  _buildInfoItem(
-                    '정확도',
-                    '${(accuracy * 100).toStringAsFixed(0)}%',
-                    PitchColors.fromAccuracy(accuracy),
-                  ),
-                  if (_timbreResult != null)
-                    _buildInfoItem(
-                      '음색',
-                      _getShortTimbreLabel(_timbreResult!),
-                      _getTimbreColor(_timbreResult!),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          
-          const SizedBox(height: 20),
-          
-          // 음색 분석 카드 (분석 중일 때만 표시)
-          if (_timbreResult != null)
-            Positioned(
-              bottom: 180,
-              left: 24,
-              right: 24,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: PitchColors.cardDark.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _getTimbreColor(_timbreResult!).withOpacity(0.5),
-                    width: 1,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.graphic_eq,
-                          color: _getTimbreColor(_timbreResult!),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '음색 분석',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // 음색 특성 바
-                    _buildTimbreBar('밝기', _timbreResult!.brightness),
-                    _buildTimbreBar('따뜻함', _timbreResult!.warmth),
-                    _buildTimbreBar('긴장도', _timbreResult!.tension),
-                    if (_timbreResult!.breathiness > 0.3)
-                      _buildTimbreBar('숨소리', _timbreResult!.breathiness),
-                  ],
-                ),
-              ),
-            ),
-          
-          // 하단 피치 그래프
-          Positioned(
-            bottom: 20,
-            left: 24,
-            right: 24,
-            child: Container(
-              height: 150,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: _pitchData.isNotEmpty ? Colors.green : Colors.orange,
-                  width: 2,
-                ),
-              ),
-              padding: const EdgeInsets.all(12),
-            child: _pitchData.isNotEmpty 
-              ? Column(
-                  children: [
-                    Text(
-                      '피치 그래프 (${_pitchData.length}개 데이터)',
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                    Expanded(
-                      child: RealtimePitchGraph(
-                        pitchData: _pitchData,
-                        isPlaying: _isPlaying,
-                      ),
-                    ),
-                  ],
-                )
-              : Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const CircularProgressIndicator(color: Colors.white54),
-                      const SizedBox(height: 8),
-                      Text(
-                        '피치 데이터 분석 중... (현재: ${_pitchData.length}개)',
-                        style: const TextStyle(color: Colors.white54),
-                      ),
-                    ],
-                  ),
-                ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1055,6 +1034,47 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
             fontWeight: FontWeight.bold,
             color: valueColor,
           ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildNikeMetric(String label, String value, String unit, Color color) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 9,
+            color: Colors.white.withOpacity(0.7),
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontFamily: 'SF Pro Display',
+              ),
+            ),
+            Text(
+              unit,
+              style: TextStyle(
+                fontSize: 10,
+                color: color.withOpacity(0.8),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ],
     );

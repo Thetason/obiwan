@@ -1,0 +1,42 @@
+[
+  {
+    "artist": "Adele",
+    "song": "Hello",
+    "url": "https://www.youtube.com/watch?v=YQHsXMglC9A",
+    "quality": "⭐⭐⭐⭐⭐",
+    "technique": "belt",
+    "timestamp": "2025-08-14T15:45:38.201443"
+  },
+  {
+    "artist": "Sam Smith",
+    "song": "Stay With Me",
+    "url": "https://www.youtube.com/watch?v=pB-5XG-DbAA",
+    "quality": "⭐⭐⭐⭐⭐",
+    "technique": "mix",
+    "timestamp": "2025-08-14T15:45:38.201550"
+  },
+  {
+    "artist": "Bruno Mars",
+    "song": "When I Was Your Man",
+    "url": "https://www.youtube.com/watch?v=ekzHIouo8Q4",
+    "quality": "⭐⭐⭐⭐⭐",
+    "technique": "mix",
+    "timestamp": "2025-08-14T15:45:38.201585"
+  },
+  {
+    "artist": "아이유",
+    "song": "밤편지",
+    "url": "https://www.youtube.com/watch?v=BzYnNdJhZQw",
+    "quality": "⭐⭐⭐⭐",
+    "technique": "mix",
+    "timestamp": "2025-08-14T15:45:38.201611"
+  },
+  {
+    "artist": "박효신",
+    "song": "야생화",
+    "url": "https://www.youtube.com/watch?v=_hsrsmwHv0A",
+    "quality": "⭐⭐⭐⭐⭐",
+    "technique": "mix",
+    "timestamp": "2025-08-14T15:45:38.201635"
+  }
+]

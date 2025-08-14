@@ -394,7 +394,12 @@ class DualEngineService {
     try {
       print('🎵 [CREPE] 분석 시작 - 데이터 크기: ${audioData.length}');
       
-      // Float32List를 안전한 Base64로 인코딩
+      // 오디오 데이터 검증 (디버깅)
+      final audioMax = audioData.reduce((a, b) => a.abs() > b.abs() ? a : b);
+      final audioRMS = math.sqrt(audioData.map((x) => x * x).reduce((a, b) => a + b) / audioData.length);
+      print('📊 [CREPE] 입력 오디오: max=${audioMax.toStringAsFixed(4)}, RMS=${audioRMS.toStringAsFixed(4)}');
+      
+      // Float32List를 안전한 Base64로 인코딩 (전처리 포함)
       final audioBase64 = _encodeAudioToBase64(audioData);
       print('🎵 [CREPE] Base64 인코딩 완료: ${audioBase64.length} 바이트');
       
@@ -439,6 +444,10 @@ class DualEngineService {
       print('⚠️ [CREPE] 분석 실패 - 응답 형식 오류');
       return null;
     } catch (e) {
+      if (e.toString().contains('silence or noise only')) {
+        print('🔇 [CREPE] 침묵/노이즈만 감지됨 - 분석 생략');
+        return null;
+      }
       print('❌ [CREPE] 분석 오류: $e');
       return null;
     }
@@ -449,7 +458,7 @@ class DualEngineService {
     try {
       print('🎵 [SPICE] 분석 시작 - 데이터 크기: ${audioData.length}');
       
-      // Float32List를 안전한 Base64로 인코딩
+      // Float32List를 안전한 Base64로 인코딩 (전처리 포함)
       final audioBase64 = _encodeAudioToBase64(audioData);
       print('🎵 [SPICE] Base64 인코딩 완료: ${audioBase64.length} 바이트');
       
@@ -480,19 +489,23 @@ class DualEngineService {
                 }
               }
               
+              // SPICE 주파수 보정 제거: 원본 주파수 그대로 사용
+              final rawFreq = frequencies[bestIdx];
+              final correctedFreq = rawFreq; // 보정 없이 원본 주파수 사용
+              
               final result = SpiceResult(
-                frequency: frequencies[bestIdx],
+                frequency: correctedFreq,
                 confidence: maxConf,
                 timestamp: DateTime.now(),
                 multiplePitches: [MultiplePitch(
-                  frequency: frequencies[bestIdx],
+                  frequency: correctedFreq,
                   strength: maxConf,
                   confidence: maxConf,
                 )],
                 detectedPitchCount: 1,
                 processingTimeMs: 100.0,  // 기본값
               );
-              print('✅ [SPICE] 분석 성공: ${result.frequency.toStringAsFixed(1)}Hz, 신뢰도: ${result.confidence}');
+              print('✅ [SPICE] 분석 성공: ${correctedFreq.toStringAsFixed(1)}Hz (원본: ${frequencies[bestIdx].toStringAsFixed(1)}Hz), 신뢰도: ${maxConf.toStringAsFixed(3)}');
               return result;
             }
           }
@@ -501,6 +514,10 @@ class DualEngineService {
       print('⚠️ [SPICE] 분석 실패 - 응답 형식 오류');
       return null;
     } catch (e) {
+      if (e.toString().contains('silence or noise only')) {
+        print('🔇 [SPICE] 침묵/노이즈만 감지됨 - 분석 생략');
+        return null;
+      }
       print('❌ [SPICE] 분석 오류: $e');
       return null;
     }
@@ -624,8 +641,10 @@ class DualEngineService {
   /// 시간별 피치 분석 (기존 CREPE+SPICE 듀얼 엔진)
   Future<List<DualResult>> analyzeTimeBasedPitch(Float32List audioData, {
     int windowSize = 48000,  // 1초 분량 (CREPE/SPICE 최적)
-    int hopSize = 12000,     // 0.25초 간격 (75% 오버랩)
+    int hopSize = 48000,     // 1초 간격 (0% 오버랩) - 극단적으로 큰 간격
     double sampleRate = 48000.0,
+    double confidenceThreshold = 0.8,  // 신뢰도 임계값을 80%로 강화
+    double minimumNoteDuration = 0.8,   // 최소 음표 지속시간을 0.8초로 강화
   }) async {
     if (audioData.length < windowSize) {
       print('⚠️ [DualEngine] 오디오 데이터가 너무 짧음: ${audioData.length} < $windowSize');
@@ -650,6 +669,13 @@ class DualEngineService {
         audioData.sublist(startIdx, endIdx)
       );
       
+      // 청크 통계 출력 (디버깅)
+      if (i == 0 || i == numWindows ~/ 2 || i == numWindows - 1) {
+        final chunkMax = chunk.reduce((a, b) => a.abs() > b.abs() ? a : b);
+        final chunkRMS = math.sqrt(chunk.map((x) => x * x).reduce((a, b) => a + b) / chunk.length);
+        print('📊 청크 $i 통계: max=${chunkMax.toStringAsFixed(4)}, RMS=${chunkRMS.toStringAsFixed(4)}');
+      }
+      
       final timeSeconds = startIdx / sampleRate;
       
       try {
@@ -662,7 +688,7 @@ class DualEngineService {
           },
         );
         
-        if (result != null && result.frequency > 0) {
+        if (result != null && result.frequency > 0 && result.confidence >= confidenceThreshold) {
           // 시간 정보를 추가한 새 결과 생성
           results.add(DualResult(
             frequency: result.frequency,
@@ -677,10 +703,13 @@ class DualEngineService {
           
           successCount++;
           if (i % 5 == 0) { // 5개마다 로그
-            print('✅ 청크 $i 분석 완료: ${result.frequency.toStringAsFixed(1)}Hz at ${timeSeconds.toStringAsFixed(2)}s');
+            print('✅ 청크 $i 분석 완료: ${result.frequency.toStringAsFixed(1)}Hz at ${timeSeconds.toStringAsFixed(2)}s (신뢰도: ${(result.confidence * 100).toInt()}%)');
           }
         } else {
           failCount++;
+          if (result?.confidence != null && result!.confidence < confidenceThreshold) {
+            print('⚠️ 청크 $i 신뢰도 낮음: ${(result.confidence * 100).toInt()}% < ${(confidenceThreshold * 100).toInt()}%');
+          }
         }
       } catch (e) {
         print('❌ 청크 $i 분석 실패: $e');
@@ -694,8 +723,74 @@ class DualEngineService {
     }
     
     final successRate = (successCount / numWindows * 100).toStringAsFixed(1);
-    print('✅ [DualEngine] 시간별 분석 완료: ${results.length}개 결과 (성공률: $successRate%)');
-    return results;
+    print('📊 [DualEngine] 원본 분석 완료: ${results.length}개 결과 (성공률: $successRate%)');
+    
+    // 음표 통합: 비슷한 연속 피치를 하나로 합침
+    final consolidatedResults = _consolidateNotes(results, minimumNoteDuration);
+    print('✅ [DualEngine] 음표 통합 완료: ${consolidatedResults.length}개 최종 결과 (${results.length}개에서 감소)');
+    
+    return consolidatedResults;
+  }
+
+  /// 음표 통합: 비슷한 연속 피치를 하나로 합침
+  List<DualResult> _consolidateNotes(List<DualResult> results, double minimumDuration) {
+    if (results.isEmpty) return results;
+    
+    final consolidated = <DualResult>[];
+    DualResult? currentNote;
+    double currentNoteStartTime = 0.0;
+    
+    for (final result in results) {
+      final frequency = result.frequency;
+      final time = result.timeSeconds ?? 0.0;
+      
+      if (currentNote == null) {
+        // 첫 번째 음표
+        currentNote = result;
+        currentNoteStartTime = time;
+      } else {
+        // 현재 음표와 비슷한지 확인 (±5% 허용)
+        final frequencyDiff = (frequency - currentNote.frequency).abs();
+        final frequencyThreshold = currentNote.frequency * 0.05; // 5% 허용
+        
+        if (frequencyDiff <= frequencyThreshold) {
+          // 같은 음표 계속 - 신뢰도가 더 높으면 업데이트
+          if (result.confidence > currentNote.confidence) {
+            currentNote = DualResult(
+              frequency: result.frequency,
+              confidence: result.confidence,
+              timestamp: result.timestamp,
+              crepeResult: result.crepeResult,
+              spiceResult: result.spiceResult,
+              recommendedEngine: result.recommendedEngine,
+              analysisQuality: result.analysisQuality,
+              timeSeconds: currentNoteStartTime, // 시작 시간 유지
+            );
+          }
+        } else {
+          // 새로운 음표 - 이전 음표가 최소 지속시간을 만족하는지 확인
+          final noteDuration = time - currentNoteStartTime;
+          if (noteDuration >= minimumDuration) {
+            consolidated.add(currentNote);
+          }
+          
+          // 새 음표 시작
+          currentNote = result;
+          currentNoteStartTime = time;
+        }
+      }
+    }
+    
+    // 마지막 음표 추가 (최소 지속시간 확인)
+    if (currentNote != null) {
+      final lastTime = results.last.timeSeconds ?? 0.0;
+      final noteDuration = lastTime - currentNoteStartTime;
+      if (noteDuration >= minimumDuration) {
+        consolidated.add(currentNote);
+      }
+    }
+    
+    return consolidated;
   }
 
   /// 듀얼 엔진 분석 (무조건 병렬 실행)
@@ -751,13 +846,124 @@ class DualEngineService {
     return crossings / data.length;
   }
   
+  /// 오디오 전처리 (노이즈 감소, 정규화, 침묵 감지)
+  Float32List _preprocessAudio(Float32List audioData) {
+    if (audioData.isEmpty) return audioData;
+    
+    try {
+      // 1. 침묵 감지
+      if (_isSilence(audioData)) {
+        debugPrint('🔇 [Preprocessing] 침묵 구간 감지됨');
+        return Float32List(0); // 빈 배열 반환하여 분석 생략
+      }
+      
+      // 2. 노이즈 감소 (간단한 하이패스 필터)
+      final filtered = _applyHighPassFilter(audioData);
+      
+      // 3. 정규화 (RMS 기반)
+      final normalized = _normalizeAudio(filtered);
+      
+      // 4. 윈도잉 (Hamming window)
+      final windowed = _applyHammingWindow(normalized);
+      
+      debugPrint('🎛️ [Preprocessing] 전처리 완료 - 원본: ${audioData.length}, 처리 후: ${windowed.length}');
+      return windowed;
+      
+    } catch (e) {
+      debugPrint('❌ [Preprocessing] 전처리 실패: $e');
+      return audioData; // 실패시 원본 반환
+    }
+  }
+  
+  /// 침묵 감지 (RMS 기반)
+  bool _isSilence(Float32List audioData, {double threshold = 0.01}) {
+    if (audioData.isEmpty) return true;
+    
+    final rms = _calculateRMS(audioData);
+    return rms < threshold;
+  }
+  
+  /// 간단한 하이패스 필터 (80Hz 이하 주파수 제거)
+  Float32List _applyHighPassFilter(Float32List audioData, {double cutoffHz = 80.0}) {
+    if (audioData.length < 2) return audioData;
+    
+    try {
+      // 간단한 1차 IIR 하이패스 필터
+      const double sampleRate = 48000.0;
+      final double rc = 1.0 / (2.0 * math.pi * cutoffHz);
+      final double dt = 1.0 / sampleRate;
+      final double alpha = rc / (rc + dt);
+      
+      final filtered = Float32List(audioData.length);
+      filtered[0] = audioData[0];
+      
+      for (int i = 1; i < audioData.length; i++) {
+        filtered[i] = alpha * (filtered[i-1] + audioData[i] - audioData[i-1]);
+      }
+      
+      return filtered;
+    } catch (e) {
+      debugPrint('❌ 하이패스 필터 실패: $e');
+      return audioData;
+    }
+  }
+  
+  /// RMS 정규화
+  Float32List _normalizeAudio(Float32List audioData, {double targetRMS = 0.3}) {
+    if (audioData.isEmpty) return audioData;
+    
+    try {
+      final currentRMS = _calculateRMS(audioData);
+      if (currentRMS < 1e-6) return audioData; // 너무 작은 신호는 정규화하지 않음
+      
+      final gain = targetRMS / currentRMS;
+      final normalized = Float32List(audioData.length);
+      
+      for (int i = 0; i < audioData.length; i++) {
+        normalized[i] = math.max(-1.0, math.min(1.0, audioData[i] * gain)); // 클리핑 방지
+      }
+      
+      return normalized;
+    } catch (e) {
+      debugPrint('❌ 정규화 실패: $e');
+      return audioData;
+    }
+  }
+  
+  /// Hamming 윈도우 적용 (스펙트럼 누수 방지)
+  Float32List _applyHammingWindow(Float32List audioData) {
+    if (audioData.isEmpty) return audioData;
+    
+    try {
+      final windowed = Float32List(audioData.length);
+      final length = audioData.length;
+      
+      for (int i = 0; i < length; i++) {
+        final window = 0.54 - 0.46 * math.cos(2.0 * math.pi * i / (length - 1));
+        windowed[i] = audioData[i] * window;
+      }
+      
+      return windowed;
+    } catch (e) {
+      debugPrint('❌ 윈도잉 실패: $e');
+      return audioData;
+    }
+  }
+  
   /// Float32List를 안전한 Base64로 인코딩
   String _encodeAudioToBase64(Float32List audioData) {
     try {
+      // 전처리 적용
+      final preprocessed = _preprocessAudio(audioData);
+      if (preprocessed.isEmpty) {
+        // 침묵이나 노이즈만 있는 경우 기본 응답 반환
+        throw Exception('Audio preprocessing detected silence or noise only');
+      }
+      
       // Float32를 바이트 배열로 변환
-      final byteData = ByteData(audioData.length * 4);
-      for (int i = 0; i < audioData.length; i++) {
-        byteData.setFloat32(i * 4, audioData[i], Endian.little);
+      final byteData = ByteData(preprocessed.length * 4);
+      for (int i = 0; i < preprocessed.length; i++) {
+        byteData.setFloat32(i * 4, preprocessed[i], Endian.little);
       }
       
       // Base64로 인코딩

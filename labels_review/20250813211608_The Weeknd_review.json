@@ -1,0 +1,27 @@
+{
+  "id": "20250813211608_The Weeknd",
+  "youtubeUrl": "https://youtu.be/example_22",
+  "artistName": "The Weeknd",
+  "songTitle": "Song 22",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "warm",
+  "pitchAccuracy": 77.1,
+  "breathSupport": 89.2,
+  "createdAt": "2025-08-13T21:16:08.024477",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 319.4579553272933,
+    "f2": 1731.5482678653175,
+    "singers_formant": 0.5382397202904716,
+    "spectral_centroid": 1647.3843095106067,
+    "base_pitch": 444.6753819510671
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

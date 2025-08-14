@@ -1,0 +1,24 @@
+{
+  "id": "20250813211608_Charlie Puth",
+  "youtubeUrl": "https://youtu.be/example_99",
+  "artistName": "Charlie Puth",
+  "songTitle": "Song 99",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "belt",
+  "tone": "neutral",
+  "pitchAccuracy": 98.7,
+  "breathSupport": 92.8,
+  "createdAt": "2025-08-13T21:16:08.044097",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 358.14706281116764,
+    "f2": 1226.2095191567173,
+    "singers_formant": 0.720874324702439,
+    "spectral_centroid": 3060.622473145662,
+    "base_pitch": 217.51626789419987
+  },
+  "ai_confidence": 0.7999999999999999,
+  "status": "medium_confidence"
+}

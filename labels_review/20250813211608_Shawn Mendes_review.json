@@ -1,0 +1,28 @@
+{
+  "id": "20250813211608_Shawn Mendes",
+  "youtubeUrl": "https://youtu.be/example_70",
+  "artistName": "Shawn Mendes",
+  "songTitle": "Song 70",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "neutral",
+  "pitchAccuracy": 70.1,
+  "breathSupport": 69.5,
+  "createdAt": "2025-08-13T21:16:08.037253",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 390.2877561150107,
+    "f2": 1851.6866275680227,
+    "singers_formant": 0.5958316995134433,
+    "spectral_centroid": 2544.7280404091125,
+    "base_pitch": 272.5703965521341
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함",
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

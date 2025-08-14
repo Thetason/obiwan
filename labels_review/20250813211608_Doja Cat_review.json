@@ -1,0 +1,28 @@
+{
+  "id": "20250813211608_Doja Cat",
+  "youtubeUrl": "https://youtu.be/example_30",
+  "artistName": "Doja Cat",
+  "songTitle": "Song 30",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "neutral",
+  "pitchAccuracy": 71.0,
+  "breathSupport": 64.7,
+  "createdAt": "2025-08-13T21:16:08.026826",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 436.0848764845957,
+    "f2": 1908.1059295615373,
+    "singers_formant": 0.3998727163953226,
+    "spectral_centroid": 2591.5371001870385,
+    "base_pitch": 483.9171660340913
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함",
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

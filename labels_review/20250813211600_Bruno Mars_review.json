@@ -1,0 +1,28 @@
+{
+  "id": "20250813211600_Bruno Mars",
+  "youtubeUrl": "https://youtu.be/example_48",
+  "artistName": "Bruno Mars",
+  "songTitle": "Song 48",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "neutral",
+  "pitchAccuracy": 70.9,
+  "breathSupport": 65.0,
+  "createdAt": "2025-08-13T21:16:00.720234",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 446.31239049319026,
+    "f2": 1479.2805525746244,
+    "singers_formant": 0.23230611029499248,
+    "spectral_centroid": 3130.397661603071,
+    "base_pitch": 259.43869646069913
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함",
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

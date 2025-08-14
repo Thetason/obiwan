@@ -2,7 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import '../models/analysis_result.dart';
-import '../models/pitch_point.dart';
+
+// RealtimePitchGraph와 호환되는 PitchPoint 정의
+// (recording_flow_modal.dart에서 정의된 것과 동일)
+class AnalysisPitchPoint {
+  final double time;
+  final double frequency;
+  final double confidence;
+  
+  AnalysisPitchPoint({
+    required this.time,
+    required this.frequency,
+    required this.confidence,
+  });
+}
+
 
 class VanidoStyleTrainingScreen extends StatefulWidget {
   final DualResult? analysisResult;
@@ -37,6 +51,7 @@ class _VanidoStyleTrainingScreenState extends State<VanidoStyleTrainingScreen>
   double _currentFrequency = 440.0;
   int _currentViewMode = 0;
   List<String> _viewModeNames = ['Analysis', 'Harmonics', 'Spectrogram', '3D View', 'Dashboard'];
+  List<AnalysisPitchPoint> _analysisPitchPoints = [];
   
   @override
   void initState() {
@@ -64,12 +79,23 @@ class _VanidoStyleTrainingScreenState extends State<VanidoStyleTrainingScreen>
   
   void _analyzePerformance() {
     if (widget.timeBasedResults != null && widget.timeBasedResults!.isNotEmpty) {
-      // 간단한 분석 로직
+      // timeBasedResults를 AnalysisPitchPoint로 변환
+      _analysisPitchPoints = [];
       double totalAccuracy = 0;
       int validPoints = 0;
       
-      for (final result in widget.timeBasedResults!) {
+      for (int i = 0; i < widget.timeBasedResults!.length; i++) {
+        final result = widget.timeBasedResults![i];
         if (result.frequency > 0 && result.confidence > 0.3) {
+          // 시간은 인덱스 기반으로 계산 (초 단위)
+          final time = (i / widget.timeBasedResults!.length) * 10.0; // 0-10초 범위
+          
+          _analysisPitchPoints.add(AnalysisPitchPoint(
+            time: time,
+            frequency: result.frequency,
+            confidence: result.confidence,
+          ));
+          
           totalAccuracy += result.confidence * 100;
           validPoints++;
         }
@@ -215,15 +241,31 @@ class _VanidoStyleTrainingScreenState extends State<VanidoStyleTrainingScreen>
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          // 배경 그리드
+      child: _currentViewMode == 0 ? _buildAnalysisView() : _buildOtherViews(),
+    );
+  }
+  
+  Widget _buildAnalysisView() {
+    return Stack(
+      children: [
+        // 피치 그래프 직접 그리기 (RealtimePitchGraph의 PitchGraphPainter 사용)
+        if (_analysisPitchPoints.isNotEmpty)
+          CustomPaint(
+            painter: AnalysisPitchGraphPainter(
+              pitchData: _analysisPitchPoints,
+              animationValue: _animation.value,
+              isPlaying: false,
+              currentTime: null,
+            ),
+            child: Container(),
+          ),
+        
+        // 피치 데이터가 없는 경우 기본 그리드와 곡선
+        if (_analysisPitchPoints.isEmpty) ...[
           CustomPaint(
             painter: GridPainter(),
             child: Container(),
           ),
-          
-          // 피치 곡선
           AnimatedBuilder(
             animation: _animation,
             builder: (context, child) {
@@ -237,73 +279,121 @@ class _VanidoStyleTrainingScreenState extends State<VanidoStyleTrainingScreen>
               );
             },
           ),
-          
-          // 현재 음 표시
-          Positioned(
-            top: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.withOpacity(0.5)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Current Note',
-                    style: TextStyle(
-                      color: Colors.blue.withOpacity(0.8),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    _currentNote,
-                    style: const TextStyle(
-                      color: Colors.blue,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${_currentFrequency.toStringAsFixed(1)} Hz',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // 뷰 모드별 정보
-          Positioned(
-            bottom: 20,
-            left: 20,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                _getViewModeDescription(),
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
         ],
-      ),
+        
+        // 뷰 모드별 정보
+        Positioned(
+          bottom: 20,
+          left: 20,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              _getViewModeDescription(),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
+  
+  Widget _buildOtherViews() {
+    return Stack(
+      children: [
+        // 배경 그리드
+        CustomPaint(
+          painter: GridPainter(),
+          child: Container(),
+        ),
+        
+        // 피치 곡선
+        AnimatedBuilder(
+          animation: _animation,
+          builder: (context, child) {
+            return CustomPaint(
+              painter: SimplePitchPainter(
+                animationValue: _animation.value,
+                currentNote: _currentNote,
+                frequency: _currentFrequency,
+              ),
+              child: Container(),
+            );
+          },
+        ),
+        
+        // 현재 음 표시
+        Positioned(
+          top: 20,
+          right: 20,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue.withOpacity(0.5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Current Note',
+                  style: TextStyle(
+                    color: Colors.blue.withOpacity(0.8),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  _currentNote,
+                  style: const TextStyle(
+                    color: Colors.blue,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${_currentFrequency.toStringAsFixed(1)} Hz',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        // 뷰 모드별 정보
+        Positioned(
+          bottom: 20,
+          left: 20,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              _getViewModeDescription(),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  
   
   String _getViewModeDescription() {
     switch (_currentViewMode) {
@@ -668,5 +758,384 @@ class SimplePitchPainter extends CustomPainter {
   @override
   bool shouldRepaint(SimplePitchPainter oldDelegate) {
     return oldDelegate.animationValue != animationValue;
+  }
+}
+
+// RealtimePitchGraph의 PitchGraphPainter를 기반으로 한 분석용 피치 그래프 페인터
+class AnalysisPitchGraphPainter extends CustomPainter {
+  final List<AnalysisPitchPoint> pitchData;
+  final double animationValue;
+  final bool isPlaying;
+  final double? currentTime;
+  
+  AnalysisPitchGraphPainter({
+    required this.pitchData,
+    required this.animationValue,
+    required this.isPlaying,
+    this.currentTime,
+  });
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 배경 그리드 그리기
+    _drawGrid(canvas, size);
+    
+    // 음정 노트 레이블
+    _drawNoteLabels(canvas, size);
+    
+    // 피치 곡선 그리기
+    if (pitchData.isNotEmpty) {
+      _drawPitchCurve(canvas, size);
+    }
+    
+    // 현재 피치 포인트 강조
+    if (pitchData.isNotEmpty) {
+      _drawCurrentPoint(canvas, size);
+    }
+  }
+  
+  void _drawGrid(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = Colors.white.withOpacity(0.15)
+      ..strokeWidth = 1;
+    
+    final majorGridPaint = Paint()
+      ..color = Colors.white.withOpacity(0.25)
+      ..strokeWidth = 1.5;
+    
+    // 수평선 (음정 구분) - 더 많은 음계 표시
+    const noteFrequencies = [
+      {'freq': 196, 'note': 'G3'}, // 솔
+      {'freq': 220, 'note': 'A3'}, // 라
+      {'freq': 247, 'note': 'B3'}, // 시
+      {'freq': 262, 'note': 'C4'}, // 도 (중앙 도)
+      {'freq': 294, 'note': 'D4'}, // 레
+      {'freq': 330, 'note': 'E4'}, // 미
+      {'freq': 349, 'note': 'F4'}, // 파
+      {'freq': 392, 'note': 'G4'}, // 솔
+      {'freq': 440, 'note': 'A4'}, // 라 (기준음)
+      {'freq': 494, 'note': 'B4'}, // 시
+      {'freq': 523, 'note': 'C5'}, // 도
+      {'freq': 587, 'note': 'D5'}, // 레
+      {'freq': 659, 'note': 'E5'}, // 미
+    ];
+    
+    for (final noteInfo in noteFrequencies) {
+      final freq = (noteInfo['freq'] as num).toDouble();
+      final y = _frequencyToY(freq, size);
+      final paint = freq == 440.0 ? majorGridPaint : gridPaint; // A4는 주요 그리드
+      
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y),
+        paint,
+      );
+    }
+    
+    // 수직선 (시간 구분)
+    const timeLines = 8;
+    for (int i = 0; i <= timeLines; i++) {
+      final x = size.width * i / timeLines;
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x, size.height),
+        gridPaint,
+      );
+    }
+  }
+  
+  void _drawNoteLabels(Canvas canvas, Size size) {
+    const notes = [
+      {'freq': 220, 'note': 'A3'},
+      {'freq': 262, 'note': 'C4'},
+      {'freq': 330, 'note': 'E4'},
+      {'freq': 440, 'note': 'A4'}, // 기준음
+      {'freq': 523, 'note': 'C5'},
+      {'freq': 659, 'note': 'E5'},
+    ];
+    
+    final textPainter = TextPainter(
+      textDirection: TextDirection.ltr,
+    );
+    
+    for (final note in notes) {
+      final freq = (note['freq'] as int).toDouble();
+      final y = _frequencyToY(freq, size);
+      
+      // A4는 기준음이므로 강조 표시
+      final isReference = freq == 440.0;
+      
+      textPainter.text = TextSpan(
+        text: note['note'] as String,
+        style: TextStyle(
+          color: isReference 
+              ? const Color(0xFF7C4DFF).withOpacity(0.9)
+              : Colors.white.withOpacity(0.6),
+          fontSize: isReference ? 12 : 10,
+          fontWeight: isReference ? FontWeight.bold : FontWeight.normal,
+        ),
+      );
+      textPainter.layout();
+      
+      // 배경 박스 추가 (기준음의 경우)
+      if (isReference) {
+        final bgRect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(2, y - 14, textPainter.width + 6, textPainter.height + 4),
+          const Radius.circular(4),
+        );
+        final bgPaint = Paint()
+          ..color = const Color(0xFF7C4DFF).withOpacity(0.2)
+          ..style = PaintingStyle.fill;
+        canvas.drawRRect(bgRect, bgPaint);
+      }
+      
+      textPainter.paint(canvas, Offset(5, y - 12));
+    }
+    
+    // 우상단에 시간 레이블
+    final timePainter = TextPainter(textDirection: TextDirection.ltr);
+    for (int i = 0; i <= 4; i++) {
+      final timeSeconds = i * 2.5; // 0, 2.5, 5, 7.5, 10초
+      final x = size.width * (timeSeconds / 10.0);
+      
+      timePainter.text = TextSpan(
+        text: '${timeSeconds.toStringAsFixed(1)}s',
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.4),
+          fontSize: 9,
+        ),
+      );
+      timePainter.layout();
+      timePainter.paint(canvas, Offset(x - timePainter.width / 2, 5));
+    }
+  }
+  
+  void _drawPitchCurve(Canvas canvas, Size size) {
+    if (pitchData.length < 2) return;
+    
+    final path = Path();
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    
+    // 첫 점으로 이동
+    if (pitchData.isEmpty) return;
+    final firstPoint = pitchData.first;
+    final firstX = _timeToX(firstPoint.time, size);
+    final firstY = _frequencyToY(firstPoint.frequency, size);
+    path.moveTo(firstX, firstY);
+    
+    // 나머지 점들 연결
+    for (int i = 1; i < pitchData.length; i++) {
+      final point = pitchData[i];
+      final x = _timeToX(point.time, size);
+      final y = _frequencyToY(point.frequency, size);
+      
+      // 베지어 곡선으로 부드럽게 연결
+      if (i > 0) {
+        final prevPoint = pitchData[i - 1];
+        final prevX = _timeToX(prevPoint.time, size);
+        final prevY = _frequencyToY(prevPoint.frequency, size);
+        
+        final controlX1 = prevX + (x - prevX) / 3;
+        final controlY1 = prevY;
+        final controlX2 = x - (x - prevX) / 3;
+        final controlY2 = y;
+        
+        path.cubicTo(controlX1, controlY1, controlX2, controlY2, x, y);
+      }
+    }
+    
+    // 그라데이션 적용
+    paint.shader = LinearGradient(
+      colors: [
+        const Color(0xFF7C4DFF),
+        const Color(0xFF9C88FF),
+        const Color(0xFFFF6B6B),
+      ],
+      stops: const [0.0, 0.5, 1.0],
+    ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    
+    canvas.drawPath(path, paint);
+    
+    // 신뢰도에 따른 투명도로 그림자 효과
+    final glowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    
+    for (int i = 1; i < pitchData.length; i++) {
+      final point = pitchData[i];
+      glowPaint.color = const Color(0xFF7C4DFF).withOpacity(point.confidence * 0.3);
+      
+      final x = _timeToX(point.time, size);
+      final y = _frequencyToY(point.frequency, size);
+      
+      if (i > 0) {
+        final prevPoint = pitchData[i - 1];
+        final prevX = _timeToX(prevPoint.time, size);
+        final prevY = _frequencyToY(prevPoint.frequency, size);
+        
+        canvas.drawLine(Offset(prevX, prevY), Offset(x, y), glowPaint);
+      }
+    }
+  }
+  
+  void _drawCurrentPoint(Canvas canvas, Size size) {
+    if (pitchData.isEmpty) return;
+    
+    // 현재 시간에 해당하는 포인트 찾기
+    AnalysisPitchPoint currentPoint;
+    
+    if (currentTime != null && isPlaying) {
+      // 재생 중이면 현재 시간에 가장 가까운 포인트 찾기
+      currentPoint = pitchData.last; // 기본값
+      double minTimeDiff = double.infinity;
+      
+      for (final point in pitchData) {
+        final timeDiff = (point.time - currentTime!).abs();
+        if (timeDiff < minTimeDiff) {
+          minTimeDiff = timeDiff;
+          currentPoint = point;
+        }
+      }
+    } else {
+      // 재생 중이 아니면 마지막 포인트 사용
+      currentPoint = pitchData.last;
+    }
+    
+    final x = _timeToX(currentPoint.time, size);
+    final y = _frequencyToY(currentPoint.frequency, size);
+    
+    // 신뢰도에 따른 색상 결정
+    final confidence = currentPoint.confidence;
+    final baseColor = confidence > 0.7 
+        ? const Color(0xFF4CAF50) // 높은 신뢰도 - 초록
+        : confidence > 0.4 
+            ? const Color(0xFF7C4DFF) // 중간 신뢰도 - 보라
+            : const Color(0xFFFF9800); // 낮은 신뢰도 - 주황
+    
+    if (isPlaying) {
+      // 재생 중일 때만 펄스 애니메이션
+      final pulseRadius = 12 + animationValue * 8;
+      
+      // 외부 원 (펄스)
+      final pulsePaint = Paint()
+        ..color = baseColor.withOpacity((1 - animationValue) * 0.4)
+        ..style = PaintingStyle.fill;
+      
+      canvas.drawCircle(Offset(x, y), pulseRadius, pulsePaint);
+      
+      // 중간 원 (글로우 효과)
+      final glowPaint = Paint()
+        ..color = baseColor.withOpacity(0.6)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3)
+        ..style = PaintingStyle.fill;
+      
+      canvas.drawCircle(Offset(x, y), 8, glowPaint);
+    }
+    
+    // 내부 원
+    final centerPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    
+    canvas.drawCircle(Offset(x, y), 6, centerPaint);
+    
+    final borderPaint = Paint()
+      ..color = baseColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    
+    canvas.drawCircle(Offset(x, y), 6, borderPaint);
+    
+    // 현재 주파수와 음정 표시
+    final noteName = _frequencyToNote(currentPoint.frequency);
+    final frequencyText = '${currentPoint.frequency.round()}Hz';
+    
+    final textPainter = TextPainter(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: noteName,
+            style: TextStyle(
+              color: baseColor,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(
+            text: '\n$frequencyText',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+    );
+    textPainter.layout();
+    
+    // 텍스트 배경
+    final textX = x - textPainter.width / 2;
+    final textY = y - 45;
+    final textBgRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(textX - 4, textY - 2, textPainter.width + 8, textPainter.height + 4),
+      const Radius.circular(6),
+    );
+    final textBgPaint = Paint()
+      ..color = Colors.black.withOpacity(0.7)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(textBgRect, textBgPaint);
+    
+    textPainter.paint(canvas, Offset(textX, textY));
+  }
+  
+  double _frequencyToY(double frequency, Size size) {
+    // 주파수 범위: 100Hz ~ 800Hz
+    const minFreq = 100.0;
+    const maxFreq = 800.0;
+    
+    final normalized = (frequency - minFreq) / (maxFreq - minFreq);
+    return size.height - (normalized * size.height);
+  }
+  
+  double _timeToX(double time, Size size) {
+    // 시간 범위: 0 ~ 10초
+    const maxTime = 10.0;
+    return (time / maxTime) * size.width;
+  }
+  
+  String _frequencyToNote(double frequency) {
+    // A4 = 440Hz를 기준으로 계산
+    const double a4 = 440.0;
+    const List<String> noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    
+    // 주파수가 너무 낮거나 높으면 빈 문자열 반환
+    if (frequency < 80 || frequency > 2000) return '';
+    
+    // A4(440Hz)로부터 몇 개의 반음(semitone) 떨어져 있는지 계산
+    final double semitonesFromA4 = 12 * (math.log(frequency / a4) / math.ln2);
+    final int semitoneIndex = semitonesFromA4.round();
+    
+    // A4는 인덱스 9 (A)
+    final int noteIndex = (9 + semitoneIndex) % 12;
+    final int octave = 4 + ((9 + semitoneIndex) ~/ 12);
+    
+    // 음정 이름과 옥타브 조합
+    final String noteName = noteNames[noteIndex < 0 ? noteIndex + 12 : noteIndex];
+    return '$noteName$octave';
+  }
+  
+  @override
+  bool shouldRepaint(AnalysisPitchGraphPainter oldDelegate) {
+    return oldDelegate.pitchData != pitchData ||
+           oldDelegate.animationValue != animationValue ||
+           oldDelegate.currentTime != currentTime ||
+           oldDelegate.isPlaying != isPlaying;
   }
 }

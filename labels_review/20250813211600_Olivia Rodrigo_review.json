@@ -1,0 +1,27 @@
+{
+  "id": "20250813211600_Olivia Rodrigo",
+  "youtubeUrl": "https://youtu.be/example_58",
+  "artistName": "Olivia Rodrigo",
+  "songTitle": "Song 58",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "belt",
+  "tone": "dark",
+  "pitchAccuracy": 79.9,
+  "breathSupport": 68.5,
+  "createdAt": "2025-08-13T21:16:00.722641",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 492.9140675368787,
+    "f2": 1719.1888244884094,
+    "singers_formant": 0.7488035365087427,
+    "spectral_centroid": 1401.6749544228824,
+    "base_pitch": 246.29371754406216
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

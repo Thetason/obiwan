@@ -1,0 +1,27 @@
+{
+  "id": "20250813211608_Bruno Mars",
+  "youtubeUrl": "https://youtu.be/example_3",
+  "artistName": "Bruno Mars",
+  "songTitle": "Song 3",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "bright",
+  "pitchAccuracy": 78.6,
+  "breathSupport": 88.2,
+  "createdAt": "2025-08-13T21:16:08.017281",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 513.2429031072934,
+    "f2": 1827.6723049643829,
+    "singers_formant": 0.2601314259564208,
+    "spectral_centroid": 3761.960110819883,
+    "base_pitch": 464.11973911371336
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

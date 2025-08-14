@@ -1,0 +1,65 @@
+[
+  {
+    "id": "20250813201102",
+    "youtubeUrl": "https://youtu.be/Df-Wo48P-M8",
+    "artistName": "Sam Smith",
+    "songTitle": "Burning",
+    "startTime": 0,
+    "endTime": 15,
+    "overallQuality": 4,
+    "technique": "mix",
+    "tone": "dark",
+    "pitchAccuracy": 84.1,
+    "breathSupport": 86.4,
+    "notes": "자동 생성된 라벨 (봇 시뮬레이션)",
+    "createdAt": "2025-08-13T20:11:02.991517",
+    "createdBy": "auto_bot",
+    "stats": {
+      "avgFrequency": 239.98,
+      "stdFrequency": 12.08,
+      "avgConfidence": 0.841
+    }
+  },
+  {
+    "id": "20250813201102",
+    "youtubeUrl": "https://youtu.be/YQHsXMglC9A",
+    "artistName": "Adele",
+    "songTitle": "Hello",
+    "startTime": 0,
+    "endTime": 15,
+    "overallQuality": 4,
+    "technique": "mix",
+    "tone": "warm",
+    "pitchAccuracy": 85.9,
+    "breathSupport": 87.6,
+    "notes": "자동 생성된 라벨 (봇 시뮬레이션)",
+    "createdAt": "2025-08-13T20:11:02.991748",
+    "createdBy": "auto_bot",
+    "stats": {
+      "avgFrequency": 252.45,
+      "stdFrequency": 11.25,
+      "avgConfidence": 0.859
+    }
+  },
+  {
+    "id": "20250813201102",
+    "youtubeUrl": "https://youtu.be/ekzHIouo8Q4",
+    "artistName": "Bruno Mars",
+    "songTitle": "When I Was Your Man",
+    "startTime": 0,
+    "endTime": 15,
+    "overallQuality": 4,
+    "technique": "mix",
+    "tone": "warm",
+    "pitchAccuracy": 83.7,
+    "breathSupport": 87.0,
+    "notes": "자동 생성된 라벨 (봇 시뮬레이션)",
+    "createdAt": "2025-08-13T20:11:02.991972",
+    "createdBy": "auto_bot",
+    "stats": {
+      "avgFrequency": 313.53,
+      "stdFrequency": 10.81,
+      "avgConfidence": 0.837
+    }
+  }
+]

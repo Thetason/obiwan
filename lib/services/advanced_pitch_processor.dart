@@ -4,11 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dual_engine_service.dart';
 import '../models/analysis_result.dart';
+import 'vibrato_analyzer.dart';
+import '../utils/pitch_color_system.dart';
 
 /// 고도화된 피치 처리 시스템
 /// 실시간 FFT, 자동 보정, 하모닉 분석 등 정교한 기능 구현
 class AdvancedPitchProcessor {
   final DualEngineService _dualEngine = DualEngineService();
+  final VibratoAnalyzer _vibratoAnalyzer = VibratoAnalyzer();
   
   // 캐시 시스템
   final Map<int, _FFTCache> _fftCache = {};
@@ -29,6 +32,17 @@ class AdvancedPitchProcessor {
   
   void dispose() {
     _cacheCleanupTimer?.cancel();
+    _vibratoAnalyzer.clearHistory();
+  }
+  
+  /// 🎵 비브라토 분석기 히스토리 초기화
+  void clearVibratoHistory() {
+    _vibratoAnalyzer.clearHistory();
+  }
+  
+  /// 📊 비브라토 분석 통계 정보
+  VibratoAnalysisStats getVibratoStats() {
+    return _vibratoAnalyzer.getAnalysisStats();
   }
   
   /// 고급 피치 분석 (실시간 처리)
@@ -68,10 +82,30 @@ class AdvancedPitchProcessor {
         sampleRate
       );
       
-      // 6. 비브라토 검출 (옵션)
+      // 6. 고급 비브라토 분석 (옵션)
       VibratoInfo? vibratoInfo;
-      if (detectVibrato) {
-        vibratoInfo = _detectVibratoAdvanced(preprocessed, sampleRate);
+      if (detectVibrato && pitchResult.frequency > 0 && pitchResult.confidence > 0.5) {
+        // PitchData 객체 생성
+        final pitchData = PitchData(
+          frequency: smoothedFreq,
+          confidence: pitchResult.confidence,
+          cents: pitchAccuracy.cents,
+          timestamp: DateTime.now(),
+          amplitude: spectrum.magnitude.isNotEmpty ? spectrum.magnitude.reduce(math.max) : 0.0,
+        );
+        
+        // 새로운 비브라토 분석기 사용
+        final vibratoResult = _vibratoAnalyzer.analyzeVibrato(pitchData);
+        
+        if (vibratoResult.isPresent) {
+          vibratoInfo = VibratoInfo(
+            rate: vibratoResult.rate,
+            depth: vibratoResult.depth,
+            regularity: vibratoResult.regularity,
+            quality: vibratoResult.quality.description,
+            intensity: vibratoResult.intensity,
+          );
+        }
       }
       
       // 7. 포먼트 분석 (음색 특성)
@@ -779,14 +813,18 @@ class HarmonicComponent {
 }
 
 class VibratoInfo {
-  final double rate;       // Hz
-  final double depth;      // cents
-  final double regularity; // 0-1
+  final double rate;         // Hz
+  final double depth;        // cents
+  final double regularity;   // 0-1
+  final String quality;      // 품질 설명
+  final double intensity;    // 강도 (0-1)
   
   VibratoInfo({
     required this.rate,
     required this.depth,
     required this.regularity,
+    this.quality = '',
+    this.intensity = 0.0,
   });
 }
 

@@ -1,0 +1,27 @@
+{
+  "id": "20250813211600_Charlie Puth",
+  "youtubeUrl": "https://youtu.be/example_24",
+  "artistName": "Charlie Puth",
+  "songTitle": "Song 24",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "bright",
+  "pitchAccuracy": 78.5,
+  "breathSupport": 74.0,
+  "createdAt": "2025-08-13T21:16:00.714099",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 335.45326713693066,
+    "f2": 1677.4499907163554,
+    "singers_formant": 0.6179349324305464,
+    "spectral_centroid": 3632.749290813588,
+    "base_pitch": 281.3198914216948
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

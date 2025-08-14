@@ -1,0 +1,24 @@
+{
+  "id": "20250813211608_Justin Bieber",
+  "youtubeUrl": "https://youtu.be/example_87",
+  "artistName": "Justin Bieber",
+  "songTitle": "Song 87",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "belt",
+  "tone": "bright",
+  "pitchAccuracy": 81.9,
+  "breathSupport": 95.6,
+  "createdAt": "2025-08-13T21:16:08.041251",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 528.1280155942947,
+    "f2": 1962.774647980712,
+    "singers_formant": 0.8263393684379856,
+    "spectral_centroid": 3826.115829144823,
+    "base_pitch": 339.29528707209977
+  },
+  "ai_confidence": 0.7999999999999999,
+  "status": "medium_confidence"
+}

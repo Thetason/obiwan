@@ -1,0 +1,188 @@
+{
+  "training_dataset": {
+    "description": "AI 학습용 YouTube 보컬 샘플 URL 리스트",
+    "selection_criteria": {
+      "genres": ["팝", "발라드", "R&B", "록", "재즈", "클래식"],
+      "vocal_quality": "프로 가수 위주, 라이브 퍼포먼스 선호",
+      "duration": "각 샘플 15-30초",
+      "diversity": "다양한 음역대, 발성 기법, 성별 포함"
+    },
+    "categories": {
+      "korean_ballad": {
+        "description": "한국 발라드 (감정 표현, 호흡 조절)",
+        "urls": [
+          {
+            "artist": "박효신",
+            "song": "야생화",
+            "url": "https://youtu.be/ZfJmLDoBXmU",
+            "start": 60,
+            "end": 75,
+            "expected_labels": {
+              "technique": "mix",
+              "tone": "warm",
+              "quality": 5
+            }
+          },
+          {
+            "artist": "이소라",
+            "song": "바람이 분다",
+            "url": "https://youtu.be/qYYwTGbO5Rw",
+            "start": 45,
+            "end": 60,
+            "expected_labels": {
+              "technique": "chest",
+              "tone": "dark",
+              "quality": 5
+            }
+          },
+          {
+            "artist": "백지영",
+            "song": "총 맞은 것처럼",
+            "url": "https://youtu.be/F2mV3L1iSg4",
+            "start": 50,
+            "end": 65,
+            "expected_labels": {
+              "technique": "belt",
+              "tone": "bright",
+              "quality": 4
+            }
+          }
+        ]
+      },
+      "pop_vocals": {
+        "description": "팝 보컬 (다양한 테크닉)",
+        "urls": [
+          {
+            "artist": "Ariana Grande",
+            "song": "Positions",
+            "url": "https://youtu.be/tcYodQoapMg",
+            "start": 30,
+            "end": 45,
+            "expected_labels": {
+              "technique": "head",
+              "tone": "bright",
+              "quality": 5
+            }
+          },
+          {
+            "artist": "Sam Smith",
+            "song": "Stay With Me",
+            "url": "https://youtu.be/pB-5XG-DbAA",
+            "start": 35,
+            "end": 50,
+            "expected_labels": {
+              "technique": "mix",
+              "tone": "warm",
+              "quality": 5
+            }
+          },
+          {
+            "artist": "Bruno Mars",
+            "song": "When I Was Your Man",
+            "url": "https://youtu.be/ekzHIouo8Q4",
+            "start": 45,
+            "end": 60,
+            "expected_labels": {
+              "technique": "chest",
+              "tone": "warm",
+              "quality": 4
+            }
+          }
+        ]
+      },
+      "power_vocals": {
+        "description": "파워 보컬 (벨팅, 고음)",
+        "urls": [
+          {
+            "artist": "소향",
+            "song": "Arirang Alone",
+            "url": "https://youtu.be/zFyndK9VOCk",
+            "start": 180,
+            "end": 195,
+            "expected_labels": {
+              "technique": "belt",
+              "tone": "bright",
+              "quality": 5
+            }
+          },
+          {
+            "artist": "Whitney Houston",
+            "song": "I Will Always Love You",
+            "url": "https://youtu.be/3JWTaaS7LdU",
+            "start": 190,
+            "end": 205,
+            "expected_labels": {
+              "technique": "belt",
+              "tone": "bright",
+              "quality": 5
+            }
+          },
+          {
+            "artist": "Beyoncé",
+            "song": "Listen",
+            "url": "https://youtu.be/JqUzmBQdhJQ",
+            "start": 160,
+            "end": 175,
+            "expected_labels": {
+              "technique": "belt",
+              "tone": "warm",
+              "quality": 5
+            }
+          }
+        ]
+      },
+      "indie_alternative": {
+        "description": "인디/얼터너티브 (독특한 음색)",
+        "urls": [
+          {
+            "artist": "Billie Eilish",
+            "song": "Ocean Eyes",
+            "url": "https://youtu.be/viimfQi_pUw",
+            "start": 20,
+            "end": 35,
+            "expected_labels": {
+              "technique": "head",
+              "tone": "dark",
+              "quality": 4
+            }
+          },
+          {
+            "artist": "아이유",
+            "song": "Blueming",
+            "url": "https://youtu.be/D1PvIWdJ8xo",
+            "start": 40,
+            "end": 55,
+            "expected_labels": {
+              "technique": "mix",
+              "tone": "neutral",
+              "quality": 4
+            }
+          }
+        ]
+      },
+      "musical_theater": {
+        "description": "뮤지컬 (명확한 딕션, 프로젝션)",
+        "urls": [
+          {
+            "artist": "김준수",
+            "song": "Gethsemane",
+            "url": "https://youtu.be/yZVLoizPLME",
+            "start": 120,
+            "end": 135,
+            "expected_labels": {
+              "technique": "belt",
+              "tone": "bright",
+              "quality": 5
+            }
+          }
+        ]
+      }
+    },
+    "total_samples": 50,
+    "usage": {
+      "training": "70% (35 samples)",
+      "validation": "20% (10 samples)",
+      "testing": "10% (5 samples)"
+    }
+  }
+}

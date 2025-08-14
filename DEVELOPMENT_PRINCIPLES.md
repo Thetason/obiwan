@@ -2,11 +2,85 @@
 A curated collection of timeless software development principles from industry legends.
 
 ## Table of Contents
+- [🚨 Critical Development Rules (From Real Failures)](#0-critical-development-rules-from-real-failures)
 - [Martin Fowler's Refactoring Principles](#1-martin-fowlers-refactoring-principles)
 - [Sajaniemi's 11 Variable Roles](#2-sajaniemis-11-variable-roles)
 - [Robert Martin's Clean Code Principles](#3-robert-martins-clean-code-principles)
 - [Kent Beck's TDD (Test-Driven Development)](#4-kent-becks-tdd-test-driven-development)
 - [Olaf Zimmermann's Microservice API Design Patterns](#5-olaf-zimmermanns-microservice-api-design-patterns)
+
+## 0. 🚨 Critical Development Rules (From Real Failures)
+
+### **NEVER AGAIN: The SPICE Frequency Correction Disaster (2025-08-12)**
+
+#### ⚠️ **What Happened**
+- User sang low notes (80-150Hz) but SPICE analyzed as high notes (300-500Hz)
+- Root cause: **Blind trust in existing "correction" code** that multiplied frequencies by 1.94x~3.25x
+- Developer focused on symptom ("too many notes") instead of core issue ("wrong pitch entirely")
+
+#### 🛑 **ABSOLUTE RULES - Never Break These**
+
+##### **Rule #1: User Says "Pitch/Frequency Wrong" → Drop Everything**
+```
+IF user mentions:
+  - "음정이 틀렸다" / "pitch is wrong"
+  - "내가 낸 음과 다르다" / "not what I sang"  
+  - "높게/낮게 나온다" / "too high/low"
+THEN:
+  1. STOP all other work
+  2. Test with KNOWN frequencies immediately
+  3. Trace every frequency transformation step-by-step
+  4. Suspect ALL correction/calibration code first
+```
+
+##### **Rule #2: Suspect Legacy "Correction" Code Most**
+```
+ANY code with these keywords is GUILTY until proven innocent:
+  - correctionFactor, calibration, adjustment
+  - frequency * multiplier, pitch + offset
+  - "compensation", "normalization"
+
+NEVER assume it's correct because "it was working before"
+```
+
+##### **Rule #3: Log Analysis Red Flags**
+```
+IF you see in logs:
+  - Frequency changes by 2x or more: 🚨 IMMEDIATE INVESTIGATION
+  - Input: 155Hz → Output: 400Hz: 🚨 STOP EVERYTHING
+  - ANY frequency transformation: 🚨 VERIFY WITH KNOWN INPUT
+```
+
+##### **Rule #4: Real User Testing is NOT Optional**
+```
+For ANY audio/frequency feature:
+1. Test with known pure tones (440Hz, 220Hz, etc.)
+2. Record yourself singing specific notes
+3. Compare analysis result with what you actually sang
+4. Ask user to verify results match their input
+
+DO NOT trust unit tests alone for frequency accuracy
+```
+
+#### 💡 **Implementation Checklist**
+
+##### Before ANY frequency-related code:
+- [ ] Test with pure sine waves of known frequencies
+- [ ] Log every transformation step (raw → processed → final)
+- [ ] Verify no unexpected multiplications/corrections
+- [ ] User validation: "Does this match what you sang?"
+
+##### When user reports frequency issues:
+- [ ] Reproduce with known test audio first
+- [ ] Check ALL frequency processing pipeline
+- [ ] Remove suspect "correction" code temporarily
+- [ ] Test raw sensor data vs final output
+
+#### 🎯 **Core Lesson**
+**"기존 코드를 의심하고, 사용자 피드백의 핵심을 놓치지 말고, 실제 데이터로 검증하라"**
+**"Doubt existing code, catch user feedback essence, verify with real data"**
+
+---
 
 ## 1. Martin Fowler's Refactoring Principles
 

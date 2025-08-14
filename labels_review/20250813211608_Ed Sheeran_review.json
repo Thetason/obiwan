@@ -1,0 +1,28 @@
+{
+  "id": "20250813211608_Ed Sheeran",
+  "youtubeUrl": "https://youtu.be/example_64",
+  "artistName": "Ed Sheeran",
+  "songTitle": "Song 64",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "dark",
+  "pitchAccuracy": 72.8,
+  "breathSupport": 87.8,
+  "createdAt": "2025-08-13T21:16:08.035654",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 415.2840180989195,
+    "f2": 1691.0161798089248,
+    "singers_formant": 0.42287295461851926,
+    "spectral_centroid": 1296.7524657590725,
+    "base_pitch": 466.0897266292905
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함",
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

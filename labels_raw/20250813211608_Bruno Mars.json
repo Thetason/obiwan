@@ -1,0 +1,24 @@
+{
+  "id": "20250813211608_Bruno Mars",
+  "youtubeUrl": "https://youtu.be/example_93",
+  "artistName": "Bruno Mars",
+  "songTitle": "Song 93",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "mix",
+  "tone": "bright",
+  "pitchAccuracy": 80.2,
+  "breathSupport": 65.7,
+  "createdAt": "2025-08-13T21:16:08.042520",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 547.3179261403286,
+    "f2": 1697.093615984716,
+    "singers_formant": 0.020260484441308235,
+    "spectral_centroid": 3970.8901379839313,
+    "base_pitch": 481.9690191595889
+  },
+  "ai_confidence": 0.7999999999999999,
+  "status": "medium_confidence"
+}

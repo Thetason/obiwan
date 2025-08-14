@@ -1,0 +1,24 @@
+{
+  "id": "20250813211608_Shawn Mendes",
+  "youtubeUrl": "https://youtu.be/example_100",
+  "artistName": "Shawn Mendes",
+  "songTitle": "Song 100",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "mix",
+  "tone": "warm",
+  "pitchAccuracy": 86.4,
+  "breathSupport": 79.2,
+  "createdAt": "2025-08-13T21:16:08.044353",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 310.8750538883563,
+    "f2": 1818.9666169583613,
+    "singers_formant": 0.1476455342385785,
+    "spectral_centroid": 2301.2864209347063,
+    "base_pitch": 422.22186050173127
+  },
+  "ai_confidence": 0.7999999999999999,
+  "status": "medium_confidence"
+}

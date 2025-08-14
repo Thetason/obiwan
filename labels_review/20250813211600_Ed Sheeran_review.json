@@ -1,0 +1,27 @@
+{
+  "id": "20250813211600_Ed Sheeran",
+  "youtubeUrl": "https://youtu.be/example_49",
+  "artistName": "Ed Sheeran",
+  "songTitle": "Song 49",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "neutral",
+  "pitchAccuracy": 75.7,
+  "breathSupport": 80.9,
+  "createdAt": "2025-08-13T21:16:00.720469",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 452.4745501032653,
+    "f2": 1650.2324901223521,
+    "singers_formant": 0.3502706021674796,
+    "spectral_centroid": 2839.754337884485,
+    "base_pitch": 488.6869376771336
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "20250813211600_Ariana Grande",
+  "youtubeUrl": "https://youtu.be/example_96",
+  "artistName": "Ariana Grande",
+  "songTitle": "Song 96",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "mix",
+  "tone": "warm",
+  "pitchAccuracy": 81.2,
+  "breathSupport": 83.0,
+  "createdAt": "2025-08-13T21:16:00.732068",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 599.4011785162475,
+    "f2": 1882.9245040902738,
+    "singers_formant": 0.6823805855395714,
+    "spectral_centroid": 2351.15631763658,
+    "base_pitch": 301.1071694952013
+  },
+  "ai_confidence": 0.7,
+  "status": "medium_confidence"
+}

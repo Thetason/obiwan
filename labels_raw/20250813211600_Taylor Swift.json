@@ -1,0 +1,24 @@
+{
+  "id": "20250813211600_Taylor Swift",
+  "youtubeUrl": "https://youtu.be/example_86",
+  "artistName": "Taylor Swift",
+  "songTitle": "Song 86",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "mix",
+  "tone": "dark",
+  "pitchAccuracy": 84.3,
+  "breathSupport": 69.0,
+  "createdAt": "2025-08-13T21:16:00.729772",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 457.47396083564047,
+    "f2": 1942.1018703424863,
+    "singers_formant": 0.155883150796147,
+    "spectral_centroid": 1460.4014404930767,
+    "base_pitch": 322.18002530022
+  },
+  "ai_confidence": 0.7999999999999999,
+  "status": "medium_confidence"
+}

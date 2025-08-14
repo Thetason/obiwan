@@ -1,0 +1,27 @@
+{
+  "id": "20250813211608_Justin Bieber",
+  "youtubeUrl": "https://youtu.be/example_72",
+  "artistName": "Justin Bieber",
+  "songTitle": "Song 72",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "dark",
+  "pitchAccuracy": 76.2,
+  "breathSupport": 71.9,
+  "createdAt": "2025-08-13T21:16:08.037839",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 433.5470482030688,
+    "f2": 1908.2757335559347,
+    "singers_formant": 0.5132560668009349,
+    "spectral_centroid": 1113.374497143499,
+    "base_pitch": 308.0498137928287
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

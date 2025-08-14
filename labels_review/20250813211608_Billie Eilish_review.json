@@ -1,0 +1,28 @@
+{
+  "id": "20250813211608_Billie Eilish",
+  "youtubeUrl": "https://youtu.be/example_65",
+  "artistName": "Billie Eilish",
+  "songTitle": "Song 65",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "belt",
+  "tone": "dark",
+  "pitchAccuracy": 70.4,
+  "breathSupport": 81.6,
+  "createdAt": "2025-08-13T21:16:08.035883",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 575.010591101068,
+    "f2": 1345.5956501986984,
+    "singers_formant": 0.7312859750410561,
+    "spectral_centroid": 1121.2098248309248,
+    "base_pitch": 376.738504965934
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함",
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

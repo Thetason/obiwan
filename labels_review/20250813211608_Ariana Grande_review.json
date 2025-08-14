@@ -1,0 +1,28 @@
+{
+  "id": "20250813211608_Ariana Grande",
+  "youtubeUrl": "https://youtu.be/example_51",
+  "artistName": "Ariana Grande",
+  "songTitle": "Song 51",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "neutral",
+  "pitchAccuracy": 73.1,
+  "breathSupport": 61.9,
+  "createdAt": "2025-08-13T21:16:08.032799",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 521.4553720307429,
+    "f2": 1496.891994105526,
+    "singers_formant": 0.6975127970573639,
+    "spectral_centroid": 2591.339130193227,
+    "base_pitch": 318.6411259678756
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함",
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

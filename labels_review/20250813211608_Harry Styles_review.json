@@ -1,0 +1,28 @@
+{
+  "id": "20250813211608_Harry Styles",
+  "youtubeUrl": "https://youtu.be/example_74",
+  "artistName": "Harry Styles",
+  "songTitle": "Song 74",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "warm",
+  "pitchAccuracy": 74.1,
+  "breathSupport": 79.9,
+  "createdAt": "2025-08-13T21:16:08.038288",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 418.40547202701833,
+    "f2": 1855.9734326019666,
+    "singers_formant": 0.3277539946736371,
+    "spectral_centroid": 2033.6269138202904,
+    "base_pitch": 341.84172536842505
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함",
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

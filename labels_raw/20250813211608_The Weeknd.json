@@ -1,0 +1,24 @@
+{
+  "id": "20250813211608_The Weeknd",
+  "youtubeUrl": "https://youtu.be/example_97",
+  "artistName": "The Weeknd",
+  "songTitle": "Song 97",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "belt",
+  "tone": "neutral",
+  "pitchAccuracy": 95.5,
+  "breathSupport": 95.2,
+  "createdAt": "2025-08-13T21:16:08.043537",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 523.3064924625162,
+    "f2": 1755.590185274111,
+    "singers_formant": 0.9030429652728599,
+    "spectral_centroid": 2826.445509101153,
+    "base_pitch": 418.9174378910793
+  },
+  "ai_confidence": 0.8999999999999999,
+  "status": "high_confidence"
+}

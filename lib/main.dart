@@ -6,6 +6,7 @@ import 'screens/fixed_vocal_training_screen.dart';
 import 'screens/wave_start_screen.dart';
 import 'screens/pitch_test_screen.dart';
 import 'screens/vocal_app_screen.dart';
+import 'design_system/screens/vj_home_screen.dart';  // New Voice Journey import
 import 'core/debug_logger.dart';
 import 'core/error_handler.dart';
 import 'core/resource_manager.dart';
@@ -154,46 +155,48 @@ class _VocalTrainerAppState extends State<VocalTrainerApp> {
   @override
   Widget build(BuildContext context) {
     final app = MaterialApp(
-      title: '오비완 v3 - 듀얼 AI 보컬 트레이너 (고도화 디버그)',
+      title: 'Voice Journey - AI Vocal Trainer',
       theme: ThemeData(
-        primaryColor: const Color(0xFF3B82F6),
+        primaryColor: const Color(0xFFFF6B6B),  // VJColors.primary
         colorScheme: const ColorScheme.light(
-          primary: Color(0xFF3B82F6),
-          secondary: Color(0xFF8B5CF6),
+          primary: Color(0xFFFF6B6B),     // Coral
+          secondary: Color(0xFF4ECDC4),   // Mint
+          tertiary: Color(0xFF9B84EC),    // Lavender
           surface: Color(0xFFFFFFFF),
-          background: Color(0xFFF8FAFC),
+          background: Color(0xFFFBFCFD),
           onPrimary: Colors.white,
           onSecondary: Colors.white,
-          onSurface: Color(0xFF1E293B),
-          onBackground: Color(0xFF1E293B),
+          onSurface: Color(0xFF1A1A1A),
+          onBackground: Color(0xFF1A1A1A),
         ),
         useMaterial3: true,
         brightness: Brightness.light,
-        fontFamily: 'System',
+        fontFamily: 'SF Pro Display',
         textTheme: const TextTheme(
           headlineLarge: TextStyle(
             fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1A1A1A),
           ),
           headlineMedium: TextStyle(
             fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1A1A1A),
           ),
           bodyLarge: TextStyle(
             fontSize: 16,
-            color: Color(0xFF1E293B),
+            color: Color(0xFF1A1A1A),
           ),
           bodyMedium: TextStyle(
             fontSize: 14,
-            color: Color(0xFF64748B),
+            color: Color(0xFF636E72),
           ),
         ),
       ),
-      initialRoute: '/',
+      initialRoute: '/vj_home',  // Start with new Voice Journey UI
       routes: {
-        '/': (context) => const VocalAppScreen(),
+        '/': (context) => const VocalAppScreen(),  // Keep existing for compatibility
+        '/vj_home': (context) => const VJHomeScreen(),  // New Voice Journey home
         '/wave_start': (context) => const WaveStartScreen(),
         '/training': (context) => const FixedVocalTrainingScreen(audioData: []),
         '/pitch_test': (context) => const PitchTestScreen(),

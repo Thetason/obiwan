@@ -1,0 +1,24 @@
+{
+  "id": "20250813211608_Ed Sheeran",
+  "youtubeUrl": "https://youtu.be/example_94",
+  "artistName": "Ed Sheeran",
+  "songTitle": "Song 94",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "mix",
+  "tone": "warm",
+  "pitchAccuracy": 98.6,
+  "breathSupport": 74.7,
+  "createdAt": "2025-08-13T21:16:08.042731",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 584.3881396244198,
+    "f2": 1960.5844826963141,
+    "singers_formant": 0.40119011070088817,
+    "spectral_centroid": 2459.980739423584,
+    "base_pitch": 473.90136170474733
+  },
+  "ai_confidence": 0.7999999999999999,
+  "status": "medium_confidence"
+}

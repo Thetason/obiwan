@@ -1,0 +1,100 @@
+{
+  "timestamp": "2025-08-14T00:34:12.553204",
+  "summary": {
+    "technique_accuracy": 100.0,
+    "tone_accuracy": 60.0,
+    "avg_confidence": 100.0
+  },
+  "results": [
+    {
+      "artist": "박효신",
+      "song": "야생화",
+      "category": "korean_ballad",
+      "expected_technique": "mix",
+      "predicted_technique": "mix",
+      "expected_tone": "warm",
+      "predicted_tone": "warm",
+      "technique_match": true,
+      "tone_match": true,
+      "confidence": 1.0,
+      "formants": {
+        "f1": 528.8329652446561,
+        "f2": 1680.201504258974,
+        "singers_formant": 0.47341725401273116
+      },
+      "breath_support": 75.99295264223208
+    },
+    {
+      "artist": "Ariana Grande",
+      "song": "Positions",
+      "category": "pop_vocals",
+      "expected_technique": "head",
+      "predicted_technique": "head",
+      "expected_tone": "bright",
+      "predicted_tone": "bright",
+      "technique_match": true,
+      "tone_match": true,
+      "confidence": 1.0,
+      "formants": {
+        "f1": 328.43168636259986,
+        "f2": 2308.045697982078,
+        "singers_formant": 0.6758274878364199
+      },
+      "breath_support": 87.81124309099053
+    },
+    {
+      "artist": "소향",
+      "song": "Arirang Alone",
+      "category": "power_vocals",
+      "expected_technique": "belt",
+      "predicted_technique": "belt",
+      "expected_tone": "bright",
+      "predicted_tone": "dark",
+      "technique_match": true,
+      "tone_match": false,
+      "confidence": 1.0,
+      "formants": {
+        "f1": 797.4328855151894,
+        "f2": 1769.7072985355735,
+        "singers_formant": 0.7599697462959665
+      },
+      "breath_support": 81.2695369909177
+    },
+    {
+      "artist": "Billie Eilish",
+      "song": "Ocean Eyes",
+      "category": "indie_alternative",
+      "expected_technique": "head",
+      "predicted_technique": "head",
+      "expected_tone": "dark",
+      "predicted_tone": "dark",
+      "technique_match": true,
+      "tone_match": true,
+      "confidence": 1.0,
+      "formants": {
+        "f1": 310.64870580022307,
+        "f2": 2389.1522309568036,
+        "singers_formant": 0.5015802507312869
+      },
+      "breath_support": 72.97971117851851
+    },
+    {
+      "artist": "김준수",
+      "song": "Gethsemane",
+      "category": "musical_theater",
+      "expected_technique": "belt",
+      "predicted_technique": "belt",
+      "expected_tone": "bright",
+      "predicted_tone": "dark",
+      "technique_match": true,
+      "tone_match": false,
+      "confidence": 1.0,
+      "formants": {
+        "f1": 760.2431774053185,
+        "f2": 1783.0723952118367,
+        "singers_formant": 0.7676837211860565
+      },
+      "breath_support": 76.75542941790768
+    }
+  ]
+}

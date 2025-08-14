@@ -1,0 +1,28 @@
+{
+  "id": "20250813211600_Adele",
+  "youtubeUrl": "https://youtu.be/example_92",
+  "artistName": "Adele",
+  "songTitle": "Song 92",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "mix",
+  "tone": "warm",
+  "pitchAccuracy": 74.0,
+  "breathSupport": 79.6,
+  "createdAt": "2025-08-13T21:16:00.731156",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 352.6024542437433,
+    "f2": 1993.8055970581559,
+    "singers_formant": 0.22595961432025757,
+    "spectral_centroid": 2106.3317418817187,
+    "base_pitch": 369.7017053413632
+  },
+  "uncertain_aspects": [
+    "발성 기법이 애매함",
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.6,
+  "status": "low_confidence"
+}

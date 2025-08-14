@@ -1,0 +1,24 @@
+{
+  "id": "20250813211608_Olivia Rodrigo",
+  "youtubeUrl": "https://youtu.be/example_88",
+  "artistName": "Olivia Rodrigo",
+  "songTitle": "Song 88",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 4,
+  "technique": "belt",
+  "tone": "warm",
+  "pitchAccuracy": 88.2,
+  "breathSupport": 78.0,
+  "createdAt": "2025-08-13T21:16:08.041468",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 479.8314749860318,
+    "f2": 1764.2631187804618,
+    "singers_formant": 0.7332486096979344,
+    "spectral_centroid": 2239.807832553626,
+    "base_pitch": 363.39036554690705
+  },
+  "ai_confidence": 0.7,
+  "status": "medium_confidence"
+}

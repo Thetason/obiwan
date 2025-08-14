@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../theme/pitch_colors.dart';
 
-/// Vanido 스타일 피치 막대 시각화
-/// 목표 음역을 반투명 띠로 표시하고 현재 피치 위치를 실시간으로 보여줌
+/// Nike Run Club inspired compact pitch bar
+/// Athletic style with neon colors and smooth animations
 class PitchBarVisualizer extends StatefulWidget {
   final double currentPitch;      // 현재 주파수 (Hz)
   final double targetPitch;       // 목표 주파수 (Hz)
@@ -91,22 +91,33 @@ class _PitchBarVisualizerState extends State<PitchBarVisualizer>
     final accuracy = isInRange ? 0.9 : (_getPitchPosition() - 0.5).abs() < 0.25 ? 0.7 : 0.3;
     
     return Container(
-      height: 120,
+      height: 80, // Compact height for Nike style
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            PitchColors.cardDark.withOpacity(0.8),
+            PitchColors.backgroundEnd.withOpacity(0.9),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isInRange ? PitchColors.neonGreen.withOpacity(0.6) : PitchColors.electricBlue.withOpacity(0.3),
+          width: 2,
+        ),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Stack(
           children: [
-            // 배경 그리드
+            // Nike-style minimal grid
             CustomPaint(
               size: Size.infinite,
-              painter: _GridPainter(),
+              painter: _NikeGridPainter(),
             ),
             
-            // 목표 음역 띠 (반투명)
+            // Nike-style target zone with athletic glow
             AnimatedBuilder(
               animation: _pulseAnimation,
               builder: (context, child) {
@@ -114,23 +125,25 @@ class _PitchBarVisualizerState extends State<PitchBarVisualizer>
                   child: Transform.scale(
                     scale: isInRange ? _pulseAnimation.value : 1.0,
                     child: Container(
-                      height: 40,
-                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      height: 24,
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: isInRange 
-                            ? PitchColors.perfect.withOpacity(0.3)
-                            : PitchColors.neutral.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
+                        gradient: LinearGradient(
+                          colors: isInRange 
+                              ? [PitchColors.neonGreen.withOpacity(0.4), PitchColors.neonGreen.withOpacity(0.2)]
+                              : [PitchColors.electricBlue.withOpacity(0.3), PitchColors.electricBlue.withOpacity(0.1)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isInRange 
-                              ? PitchColors.perfect.withOpacity(0.6)
-                              : PitchColors.neutral.withOpacity(0.4),
-                          width: 2,
+                              ? PitchColors.neonGreen.withOpacity(0.8)
+                              : PitchColors.electricBlue.withOpacity(0.5),
+                          width: 1.5,
                         ),
                         boxShadow: isInRange ? [
                           BoxShadow(
-                            color: PitchColors.perfect.withOpacity(0.4),
-                            blurRadius: 20,
+                            color: PitchColors.neonGreen.withOpacity(0.6),
+                            blurRadius: 16,
                             spreadRadius: 2,
                           ),
                         ] : null,
@@ -141,80 +154,119 @@ class _PitchBarVisualizerState extends State<PitchBarVisualizer>
               },
             ),
             
-            // 현재 피치 위치 표시
+            // Nike-style pitch position indicator
             if (widget.currentPitch > 0)
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 50),
-                top: 20,
-                bottom: 20,
-                left: MediaQuery.of(context).size.width * _getPitchPosition() - 30,
+                top: 16,
+                bottom: 16,
+                left: MediaQuery.of(context).size.width * _getPitchPosition() - 40,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  width: 6,
+                  width: 4,
                   decoration: BoxDecoration(
-                    color: PitchColors.fromAccuracy(accuracy)
-                        .withOpacity(0.8 + (widget.confidence * 0.2)),
-                    borderRadius: BorderRadius.circular(3),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        PitchColors.fromAccuracy(accuracy),
+                        PitchColors.fromAccuracy(accuracy).withOpacity(0.6),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(2),
                     boxShadow: [
                       BoxShadow(
-                        color: PitchColors.fromAccuracy(accuracy).withOpacity(0.6),
-                        blurRadius: 10,
-                        spreadRadius: 2,
+                        color: PitchColors.fromAccuracy(accuracy).withOpacity(0.8),
+                        blurRadius: 12,
+                        spreadRadius: 1,
                       ),
                     ],
                   ),
                 ),
               ),
             
-            // 중앙 목표선
+            // Nike-style center target line
             Center(
               child: Container(
-                width: 2,
-                height: 60,
-                color: Colors.white.withOpacity(0.3),
+                width: 3,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withOpacity(0.8),
+                      Colors.white.withOpacity(0.4),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.3),
+                      blurRadius: 4,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
               ),
             ),
             
-            // 상태 텍스트
+            // Nike-style status indicator
             Positioned(
-              top: 8,
-              right: 16,
-              child: AnimatedDefaultTextStyle(
+              top: 6,
+              right: 12,
+              child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
-                style: TextStyle(
-                  color: isInRange ? PitchColors.perfect : Colors.white70,
-                  fontSize: 12,
-                  fontWeight: isInRange ? FontWeight.bold : FontWeight.normal,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isInRange 
+                      ? PitchColors.neonGreen.withOpacity(0.2)
+                      : PitchColors.electricBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isInRange ? PitchColors.neonGreen : PitchColors.electricBlue,
+                    width: 1,
+                  ),
                 ),
                 child: Text(
-                  isInRange ? 'PERFECT!' : 
+                  isInRange ? 'PERFECT' : 
                   accuracy > 0.7 ? 'CLOSE' : 
-                  widget.currentPitch > widget.targetPitch ? 'TOO HIGH' : 'TOO LOW',
+                  widget.currentPitch > widget.targetPitch ? 'HIGH' : 'LOW',
+                  style: TextStyle(
+                    color: isInRange ? PitchColors.neonGreen : PitchColors.electricBlue,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'SF Pro Display',
+                  ),
                 ),
               ),
             ),
             
-            // 주파수 표시
+            // Nike-style frequency display - left side
             Positioned(
-              bottom: 8,
-              left: 16,
+              bottom: 6,
+              left: 12,
               child: Text(
-                '${widget.currentPitch.toStringAsFixed(1)} Hz',
+                '${widget.currentPitch.toStringAsFixed(1)}Hz',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: PitchColors.fromAccuracy(accuracy).withOpacity(0.9),
                   fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'SF Pro Display',
                 ),
               ),
             ),
             
+            // Target frequency - right side
             Positioned(
-              bottom: 8,
-              right: 16,
+              bottom: 6,
+              right: 12,
               child: Text(
-                'Target: ${widget.targetPitch.toStringAsFixed(1)} Hz',
+                '${widget.targetPitch.toStringAsFixed(0)}Hz',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 11,
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -225,32 +277,32 @@ class _PitchBarVisualizerState extends State<PitchBarVisualizer>
   }
 }
 
-// 배경 그리드 페인터
-class _GridPainter extends CustomPainter {
+// Nike-style minimal grid painter
+class _NikeGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.05)
-      ..strokeWidth = 1;
+    final subtlePaint = Paint()
+      ..color = PitchColors.electricBlue.withOpacity(0.1)
+      ..strokeWidth = 0.5;
     
-    // 수직선 그리기
-    for (int i = 1; i < 5; i++) {
-      final x = size.width * (i / 5);
+    // Minimal vertical lines
+    for (int i = 1; i < 4; i++) {
+      final x = size.width * (i / 4);
       canvas.drawLine(
-        Offset(x, 0),
-        Offset(x, size.height),
-        paint,
+        Offset(x, size.height * 0.2),
+        Offset(x, size.height * 0.8),
+        subtlePaint,
       );
     }
     
-    // 수평선 그리기
+    // Single center horizontal line
     canvas.drawLine(
-      Offset(0, size.height / 2),
-      Offset(size.width, size.height / 2),
-      paint..color = Colors.white.withOpacity(0.1),
+      Offset(size.width * 0.1, size.height / 2),
+      Offset(size.width * 0.9, size.height / 2),
+      subtlePaint..color = PitchColors.electricBlue.withOpacity(0.15),
     );
   }
   
   @override
-  bool shouldRepaint(_GridPainter oldDelegate) => false;
+  bool shouldRepaint(_NikeGridPainter oldDelegate) => false;
 }

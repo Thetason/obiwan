@@ -1,0 +1,27 @@
+{
+  "id": "20250813211600_Dua Lipa",
+  "youtubeUrl": "https://youtu.be/example_98",
+  "artistName": "Dua Lipa",
+  "songTitle": "Song 98",
+  "startTime": 30,
+  "endTime": 45,
+  "overallQuality": 3,
+  "technique": "belt",
+  "tone": "warm",
+  "pitchAccuracy": 70.3,
+  "breathSupport": 84.9,
+  "createdAt": "2025-08-13T21:16:00.732523",
+  "createdBy": "ai_bot",
+  "analysis_metadata": {
+    "f1": 321.9372308014073,
+    "f2": 1248.1008863459108,
+    "singers_formant": 0.8667450045896791,
+    "spectral_centroid": 1506.4315897263314,
+    "base_pitch": 303.8285247336021
+  },
+  "uncertain_aspects": [
+    "음정 분석 신뢰도 낮음"
+  ],
+  "ai_confidence": 0.7,
+  "status": "medium_confidence"
+}
