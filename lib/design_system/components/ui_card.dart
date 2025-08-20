@@ -36,7 +36,7 @@ class UICard extends StatelessWidget {
   });
 
   /// 헤더와 컨텐츠가 있는 카드
-  const UICard.withHeader({
+  UICard.withHeader({
     super.key,
     required Widget header,
     required Widget content,
@@ -49,7 +49,7 @@ class UICard extends StatelessWidget {
   }) : child = _CardWithHeader(header: header, content: content);
 
   /// 피치 정보를 표시하는 전용 카드
-  const UICard.pitch({
+  UICard.pitch({
     super.key,
     required String frequency,
     required String note,
@@ -67,7 +67,7 @@ class UICard extends StatelessWidget {
        );
 
   /// 분석 결과를 표시하는 전용 카드
-  const UICard.analysis({
+  UICard.analysis({
     super.key,
     required String title,
     required String value,

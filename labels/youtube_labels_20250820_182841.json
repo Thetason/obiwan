@@ -1,0 +1,332 @@
+[
+  {
+    "url": "https://youtube.com/test1",
+    "title": "Sample Song (Simulation)",
+    "duration": 30,
+    "labels": [
+      {
+        "time": 0.0,
+        "frequency": 261.63,
+        "note": "D4",
+        "confidence": 0.9300832476253573,
+        "volume": 0.6133241219104291,
+        "vibrato": 0.12569691016611714,
+        "technique": "head"
+      },
+      {
+        "time": 3.0,
+        "frequency": 466.1580480213773,
+        "note": "C4",
+        "confidence": 0.7688484105442807,
+        "volume": 0.5735269781327595,
+        "vibrato": 0.29945181374857444,
+        "technique": "mixed"
+      },
+      {
+        "time": 6.0,
+        "frequency": 261.63,
+        "note": "A4",
+        "confidence": 0.7997986847738446,
+        "volume": 0.6760198616881549,
+        "vibrato": 0.10227838424541093,
+        "technique": "head"
+      },
+      {
+        "time": 9.0,
+        "frequency": 439.99589226717126,
+        "note": "A4",
+        "confidence": 0.8581611373040267,
+        "volume": 0.6090183764311672,
+        "vibrato": 0.01734438354272143,
+        "technique": "head"
+      },
+      {
+        "time": 12.0,
+        "frequency": 493.87580555672844,
+        "note": "E4",
+        "confidence": 0.8912838179366978,
+        "volume": 0.5521665604212278,
+        "vibrato": 0.2687437947864612,
+        "technique": "mixed"
+      },
+      {
+        "time": 15.0,
+        "frequency": 261.63,
+        "note": "D4",
+        "confidence": 0.8051428050120581,
+        "volume": 0.5906559289502104,
+        "vibrato": 0.29002436722980757,
+        "technique": "mixed"
+      },
+      {
+        "time": 18.0,
+        "frequency": 329.62929328089496,
+        "note": "G4",
+        "confidence": 0.8087928234830966,
+        "volume": 0.796421364824022,
+        "vibrato": 0.06997255365926683,
+        "technique": "chest"
+      },
+      {
+        "time": 21.0,
+        "frequency": 311.12953134700217,
+        "note": "C4",
+        "confidence": 0.8599791937288992,
+        "volume": 0.5041848600814681,
+        "vibrato": 0.12181279005875953,
+        "technique": "mixed"
+      },
+      {
+        "time": 24.0,
+        "frequency": 277.1865198,
+        "note": "E4",
+        "confidence": 0.9160747559442045,
+        "volume": 0.8604710858731768,
+        "vibrato": 0.1887936964610958,
+        "technique": "head"
+      },
+      {
+        "time": 27.0,
+        "frequency": 293.66803026730804,
+        "note": "D4",
+        "confidence": 0.8696251200444828,
+        "volume": 0.8675972440082547,
+        "vibrato": 0.12844399891460132,
+        "technique": "head"
+      }
+    ],
+    "analysis": {
+      "average_pitch": "G4",
+      "pitch_range": "C4 - C5",
+      "vocal_type": "Tenor",
+      "difficulty": "Medium",
+      "techniques": [
+        "vibrato",
+        "legato",
+        "mixed voice"
+      ]
+    },
+    "timestamp": "2025-08-20T18:28:41.122825",
+    "mode": "simulation"
+  },
+  {
+    "url": "https://youtube.com/test2",
+    "title": "Sample Song (Simulation)",
+    "duration": 30,
+    "labels": [
+      {
+        "time": 0.0,
+        "frequency": 466.1580480213773,
+        "note": "D4",
+        "confidence": 0.7450031519531636,
+        "volume": 0.6428531662411413,
+        "vibrato": 0.030482531112481615,
+        "technique": "mixed"
+      },
+      {
+        "time": 3.0,
+        "frequency": 369.99421043536756,
+        "note": "A4",
+        "confidence": 0.8850640898590539,
+        "volume": 0.6777664491714143,
+        "vibrato": 0.10119317400620677,
+        "technique": "mixed"
+      },
+      {
+        "time": 6.0,
+        "frequency": 523.2416609551316,
+        "note": "D4",
+        "confidence": 0.7050485790441106,
+        "volume": 0.7013840594643443,
+        "vibrato": 0.21628918689490956,
+        "technique": "chest"
+      },
+      {
+        "time": 9.0,
+        "frequency": 439.99589226717126,
+        "note": "D4",
+        "confidence": 0.9424441874537004,
+        "volume": 0.5824761622493956,
+        "vibrato": 0.16266385263193434,
+        "technique": "mixed"
+      },
+      {
+        "time": 12.0,
+        "frequency": 415.3020333633844,
+        "note": "B4",
+        "confidence": 0.7092968613332471,
+        "volume": 0.5862289609836315,
+        "vibrato": 0.05563146908277037,
+        "technique": "head"
+      },
+      {
+        "time": 15.0,
+        "frequency": 277.1865198,
+        "note": "B4",
+        "confidence": 0.7663406264884182,
+        "volume": 0.5500164635513893,
+        "vibrato": 0.08050694973549398,
+        "technique": "mixed"
+      },
+      {
+        "time": 18.0,
+        "frequency": 466.1580480213773,
+        "note": "E4",
+        "confidence": 0.7895856051483394,
+        "volume": 0.758252638337285,
+        "vibrato": 0.025959351894010062,
+        "technique": "mixed"
+      },
+      {
+        "time": 21.0,
+        "frequency": 523.2416609551316,
+        "note": "C5",
+        "confidence": 0.9364755435740378,
+        "volume": 0.5337110036947974,
+        "vibrato": 0.21319419371725423,
+        "technique": "mixed"
+      },
+      {
+        "time": 24.0,
+        "frequency": 349.229051059377,
+        "note": "F4",
+        "confidence": 0.8314100839595183,
+        "volume": 0.5663844937437063,
+        "vibrato": 0.26010878114874636,
+        "technique": "head"
+      },
+      {
+        "time": 27.0,
+        "frequency": 466.1580480213773,
+        "note": "G4",
+        "confidence": 0.8913585691309291,
+        "volume": 0.6128753285261469,
+        "vibrato": 0.25197342535577333,
+        "technique": "head"
+      }
+    ],
+    "analysis": {
+      "average_pitch": "G4",
+      "pitch_range": "C4 - C5",
+      "vocal_type": "Tenor",
+      "difficulty": "Medium",
+      "techniques": [
+        "vibrato",
+        "legato",
+        "mixed voice"
+      ]
+    },
+    "timestamp": "2025-08-20T18:28:41.122871",
+    "mode": "simulation"
+  },
+  {
+    "url": "https://youtube.com/test3",
+    "title": "Sample Song (Simulation)",
+    "duration": 30,
+    "labels": [
+      {
+        "time": 0.0,
+        "frequency": 311.12953134700217,
+        "note": "F4",
+        "confidence": 0.7263746617584558,
+        "volume": 0.7526985355654487,
+        "vibrato": 0.06725286064872399,
+        "technique": "chest"
+      },
+      {
+        "time": 3.0,
+        "frequency": 311.12953134700217,
+        "note": "A4",
+        "confidence": 0.924833571467827,
+        "volume": 0.5447752195521887,
+        "vibrato": 0.27438337030753596,
+        "technique": "mixed"
+      },
+      {
+        "time": 6.0,
+        "frequency": 349.229051059377,
+        "note": "A4",
+        "confidence": 0.7594465702309865,
+        "volume": 0.8335526413055919,
+        "vibrato": 0.22154892747789504,
+        "technique": "mixed"
+      },
+      {
+        "time": 9.0,
+        "frequency": 293.66803026730804,
+        "note": "C5",
+        "confidence": 0.8127671929267313,
+        "volume": 0.5751803280172512,
+        "vibrato": 0.14675761984189845,
+        "technique": "mixed"
+      },
+      {
+        "time": 12.0,
+        "frequency": 369.99421043536756,
+        "note": "F4",
+        "confidence": 0.7228050974561742,
+        "volume": 0.6066321194381488,
+        "vibrato": 0.29951442330563116,
+        "technique": "chest"
+      },
+      {
+        "time": 15.0,
+        "frequency": 493.87580555672844,
+        "note": "C5",
+        "confidence": 0.7366198876966499,
+        "volume": 0.6632921205729319,
+        "vibrato": 0.1747471647591588,
+        "technique": "head"
+      },
+      {
+        "time": 18.0,
+        "frequency": 349.229051059377,
+        "note": "G4",
+        "confidence": 0.8613135749800589,
+        "volume": 0.7301815250561209,
+        "vibrato": 0.22390593100603845,
+        "technique": "mixed"
+      },
+      {
+        "time": 21.0,
+        "frequency": 439.99589226717126,
+        "note": "F4",
+        "confidence": 0.7692761896581541,
+        "volume": 0.6366685469027114,
+        "vibrato": 0.07760531386085621,
+        "technique": "chest"
+      },
+      {
+        "time": 24.0,
+        "frequency": 466.1580480213773,
+        "note": "F4",
+        "confidence": 0.869103375091516,
+        "volume": 0.7112654327436845,
+        "vibrato": 0.13358964250035055,
+        "technique": "head"
+      },
+      {
+        "time": 27.0,
+        "frequency": 466.1580480213773,
+        "note": "D4",
+        "confidence": 0.7286155977802333,
+        "volume": 0.7895253738021096,
+        "vibrato": 0.13425602057375693,
+        "technique": "mixed"
+      }
+    ],
+    "analysis": {
+      "average_pitch": "G4",
+      "pitch_range": "C4 - C5",
+      "vocal_type": "Tenor",
+      "difficulty": "Medium",
+      "techniques": [
+        "vibrato",
+        "legato",
+        "mixed voice"
+      ]
+    },
+    "timestamp": "2025-08-20T18:28:41.122907",
+    "mode": "simulation"
+  }
+]

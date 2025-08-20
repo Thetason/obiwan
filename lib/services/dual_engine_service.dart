@@ -368,6 +368,45 @@ class DualEngineService {
   }
   
   /// 서버 상태 확인
+  // Public initialize method for external access
+  Future<void> initialize() async {
+    await checkStatus();
+  }
+
+  // Analyze pitch method for compatibility
+  Future<Map<String, dynamic>> analyzePitch(Float32List audioData) async {
+    final result = await analyzeSinglePitch(audioData);
+    if (result == null) {
+      return {
+        'frequency': 0.0,
+        'confidence': 0.0,
+        'note': '',
+        'error': 'No pitch detected'
+      };
+    }
+    return {
+      'frequency': result.frequency,
+      'confidence': result.confidence,
+      'note': result.noteName ?? '',
+      'timestamp': DateTime.now().toIso8601String()
+    };
+  }
+
+  // Getter for pitch stream
+  Stream<Map<String, dynamic>> get pitchStream {
+    // Create a realtime analysis stream
+    final analysisStream = RealtimeAnalysisStream._internal(this);
+    analysisStream.startStream();
+    
+    // Convert DualResult stream to Map stream
+    return analysisStream.stream.map((result) => {
+      'frequency': result.frequency,
+      'confidence': result.confidence,
+      'note': result.noteName ?? '',
+      'timestamp': DateTime.now().toIso8601String()
+    });
+  }
+
   Future<EngineStatus> checkStatus() async {
     final crepeHealthy = await _checkServerHealth(_crepeClient);
     final spiceHealthy = await _checkServerHealth(_spiceClient);
@@ -1131,7 +1170,10 @@ class EngineStatus {
 
 /// 실시간 스트림
 class RealtimeAnalysisStream {
-  final DualEngineService _service = DualEngineService();
+  final DualEngineService _service;
+  
+  RealtimeAnalysisStream._internal(this._service);
+  
   final StreamController<DualResult> _controller = 
       StreamController<DualResult>.broadcast();
   

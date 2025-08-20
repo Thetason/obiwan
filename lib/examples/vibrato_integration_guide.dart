@@ -499,5 +499,3 @@ class VibratoTestingFramework {
 /// 3. UI/UX 피드백 수집 및 개선
 /// 4. 성능 프로파일링 및 최적화
 /// 5. 사용자 가이드 및 튜토리얼 제작
-
-import 'dart:math' as math;

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'ai_labeling_dashboard.dart';
 
 /// YouTube URL 입력 화면
@@ -19,6 +21,10 @@ class _URLInputScreenState extends State<URLInputScreen> {
   final _songController = TextEditingController();
   final _startController = TextEditingController(text: '30');
   final _endController = TextEditingController(text: '45');
+  
+  final FocusNode _urlFocus = FocusNode();
+  final FocusNode _artistFocus = FocusNode();
+  final FocusNode _songFocus = FocusNode();
   
   bool _isLoadingPreset = false;
   
@@ -188,9 +194,20 @@ class _URLInputScreenState extends State<URLInputScreen> {
                     const SizedBox(height: 16),
                     
                     // URL Input
-                    TextField(
-                      controller: _urlController,
-                      style: const TextStyle(color: Colors.white),
+                    Material(
+                      color: Colors.transparent,
+                      child: TextField(
+                        controller: _urlController,
+                        focusNode: _urlFocus,
+                        style: const TextStyle(color: Colors.white),
+                        keyboardType: TextInputType.url,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        enableIMEPersonalizedLearning: false,
+                        textInputAction: TextInputAction.next,
+                        onEditingComplete: () {
+                          FocusScope.of(context).requestFocus(_artistFocus);
+                        },
                       decoration: InputDecoration(
                         labelText: 'YouTube URL',
                         labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
@@ -203,6 +220,15 @@ class _URLInputScreenState extends State<URLInputScreen> {
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide.none,
                         ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: const Color(0xFF7C4DFF), width: 2),
+                        ),
+                      ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -213,7 +239,14 @@ class _URLInputScreenState extends State<URLInputScreen> {
                         Expanded(
                           child: TextField(
                             controller: _artistController,
+                            focusNode: _artistFocus,
                             style: const TextStyle(color: Colors.white),
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            textInputAction: TextInputAction.next,
+                            onEditingComplete: () {
+                              FocusScope.of(context).requestFocus(_songFocus);
+                            },
                             decoration: InputDecoration(
                               labelText: '아티스트',
                               labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
@@ -224,6 +257,14 @@ class _URLInputScreenState extends State<URLInputScreen> {
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide: BorderSide.none,
                               ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: const Color(0xFF7C4DFF), width: 2),
+                              ),
                             ),
                           ),
                         ),
@@ -231,7 +272,14 @@ class _URLInputScreenState extends State<URLInputScreen> {
                         Expanded(
                           child: TextField(
                             controller: _songController,
+                            focusNode: _songFocus,
                             style: const TextStyle(color: Colors.white),
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            textInputAction: TextInputAction.done,
+                            onEditingComplete: () {
+                              FocusScope.of(context).unfocus();
+                            },
                             decoration: InputDecoration(
                               labelText: '곡명',
                               labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
@@ -241,6 +289,14 @@ class _URLInputScreenState extends State<URLInputScreen> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: const Color(0xFF7C4DFF), width: 2),
                               ),
                             ),
                           ),
@@ -476,6 +532,9 @@ class _URLInputScreenState extends State<URLInputScreen> {
     _songController.dispose();
     _startController.dispose();
     _endController.dispose();
+    _urlFocus.dispose();
+    _artistFocus.dispose();
+    _songFocus.dispose();
     super.dispose();
   }
 }
@@ -494,11 +553,49 @@ class AILabelingDashboardWithData extends AILabelingDashboard {
 }
 
 class _AILabelingDashboardWithDataState extends State<AILabelingDashboard> {
+  bool _isProcessing = true;
+  List<dynamic> _results = [];
+  String _errorMessage = '';
+  
   @override
   void initState() {
     super.initState();
     // URL 리스트를 사용하여 처리 시작
     print('Processing ${(widget as AILabelingDashboardWithData).urlList.length} URLs');
+    _startProcessing();
+  }
+  
+  Future<void> _startProcessing() async {
+    final urls = (widget as AILabelingDashboardWithData).urlList;
+    final urlStrings = urls.map((item) => item['url'] as String).toList();
+    
+    try {
+      // Virtual Listener 서버로 요청 (스트리밍 방식)
+      final response = await http.post(
+        Uri.parse('http://localhost:5006/batch_listen'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'urls': urlStrings}),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _results = data['results'] ?? [];
+          _isProcessing = false;
+        });
+        print('✅ 라벨링 완료: ${_results.length}개');
+      } else {
+        setState(() {
+          _errorMessage = '서버 오류: ${response.statusCode}';
+          _isProcessing = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = '오류: $e';
+        _isProcessing = false;
+      });
+    }
   }
 
   @override
@@ -507,20 +604,89 @@ class _AILabelingDashboardWithDataState extends State<AILabelingDashboard> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Labeling Dashboard'),
+        title: const Text('Virtual Listener - AI 라벨링'),
+        backgroundColor: const Color(0xFF7C4DFF),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Processing ${urls.length} URLs'),
-            const SizedBox(height: 20),
-            const CircularProgressIndicator(),
-            const SizedBox(height: 20),
-            const Text('AI labeling in progress...'),
-          ],
-        ),
-      ),
+      body: _isProcessing
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C4DFF)),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    '🎧 Virtual Listener가 음악을 듣는 중...',
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '${urls.length}개 URL을 30초씩 스트리밍 분석 중',
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            )
+          : _errorMessage.isNotEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error, color: Colors.red, size: 60),
+                      const SizedBox(height: 20),
+                      Text(_errorMessage),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('돌아가기'),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _results.length,
+                  itemBuilder: (context, index) {
+                    final result = _results[index];
+                    final analysis = result['analysis'] ?? {};
+                    
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              result['title'] ?? 'Unknown',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text('아티스트: ${result['artist'] ?? 'Unknown'}'),
+                            Text('분석 시간: ${result['duration_analyzed']}초'),
+                            const Divider(),
+                            Text('감지된 음: ${analysis['detected_notes'] ?? 0}개'),
+                            Text('평균 음정: ${analysis['average_pitch'] ?? 'Unknown'}'),
+                            Text('음역대: ${analysis['pitch_range'] ?? 'Unknown'}'),
+                            Text('주요 발성: ${analysis['main_technique'] ?? 'Unknown'}'),
+                            Text(
+                              '신뢰도: ${((analysis['confidence_avg'] ?? 0) * 100).toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                color: (analysis['confidence_avg'] ?? 0) > 0.8
+                                    ? Colors.green
+                                    : Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }

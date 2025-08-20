@@ -180,12 +180,13 @@ class RealTimeAudioRecorder: NSObject, AVAudioPlayerDelegate {
         return
       }
       
-      // CRITICAL FIX: Use nil format to let input node use its native format
-      // This prevents format conversion issues that can block the callback
-      print("🎤 [RealTime] 사용할 포맷: 입력 노드 네이티브 포맷 (\(inputFormat))")
+      // CRITICAL FIX: macOS에서는 명시적 포맷 지정이 필요
+      // 48kHz로 명시적 포맷 설정
+      let recordingFormat = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)!
+      print("🎤 [RealTime] 녹음 포맷 설정: 48kHz, 1채널")
       
-      // 탭 설치 - nil 포맷 사용 (네이티브 포맷)
-      input.installTap(onBus: 0, bufferSize: bufferSize, format: nil) { [weak self] (buffer, when) in
+      // 탭 설치 - 명시적 포맷 사용
+      input.installTap(onBus: 0, bufferSize: bufferSize, format: recordingFormat) { [weak self] (buffer, when) in
         // 즉시 로깅 - 어떤 스레드에서든 호출되었는지 확인
         print("📥 [RealTime] *** TAP CALLBACK RECEIVED *** - frameLength: \(buffer.frameLength)")
         

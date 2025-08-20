@@ -284,7 +284,7 @@ class AdvancedPitchTracker {
     
     return PitchData(
       frequency: frequency,
-      confidence: confidence.clamp(0, 1),
+      confidence: confidence.toDouble().clamp(0.0, 1.0),
       timestamp: DateTime.now(),
     );
   }

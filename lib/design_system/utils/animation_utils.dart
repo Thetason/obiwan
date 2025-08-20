@@ -228,7 +228,7 @@ class VocalAnimations {
     required double accuracy,
     Duration duration = const Duration(milliseconds: 200),
   }) {
-    return TweenAnimationBuilder<Color>(
+    return TweenAnimationBuilder<Color?>(
       tween: ColorTween(
         begin: Colors.grey,
         end: _getAccuracyColor(accuracy),

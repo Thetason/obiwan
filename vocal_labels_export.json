@@ -1,0 +1,49 @@
+{
+  "export_date": "2025-08-20T22:23:48.295744",
+  "total_labels": 1,
+  "labels": [
+    {
+      "id": 1,
+      "youtube_url": "https://youtu.be/example",
+      "title": "Adele - Hello",
+      "artist": "Adele",
+      "song_name": "Hello",
+      "duration_analyzed": 30.0,
+      "created_at": "2025-08-20 13:23:48",
+      "detected_notes": 24,
+      "average_pitch": 220.5,
+      "pitch_range": "A3-E5",
+      "main_technique": "Chest Voice",
+      "confidence_avg": 0.85,
+      "pitch_data": [
+        {
+          "time": 0.5,
+          "pitch": 220.0,
+          "note": "A3",
+          "confidence": 0.9
+        },
+        {
+          "time": 1.0,
+          "pitch": 246.9,
+          "note": "B3",
+          "confidence": 0.87
+        }
+      ],
+      "note_sequence": [
+        "A3",
+        "B3",
+        "C4",
+        "D4",
+        "E4"
+      ],
+      "vibrato_analysis": {},
+      "dynamics_data": {},
+      "category": "Pop Ballad",
+      "difficulty_level": 3,
+      "genre": "Pop",
+      "language": "en",
+      "user_rating": null,
+      "notes": null
+    }
+  ]
+}

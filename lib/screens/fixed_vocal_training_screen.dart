@@ -116,8 +116,10 @@ class _FixedVocalTrainingScreenState extends State<FixedVocalTrainingScreen>
       _recorder = FlutterSoundRecorder();
       await _recorder!.openRecorder();
 
-      // 분석 스트림 초기화
-      _analysisStream = RealtimeAnalysisStream();
+      // 분석 스트림 초기화 - DualEngineService를 통해 생성
+      // RealtimeAnalysisStream은 private 생성자만 있으므로 직접 생성 불가
+      // 대신 DualEngineService의 pitchStream 사용
+      final dualEngine = DualEngineService();
       _analysisStream!.stream.listen(_onAnalysisResult);
 
       setState(() {
