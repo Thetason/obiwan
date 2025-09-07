@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import '../design_system/tokens.dart';
 import '../design_system/components/ui_button.dart';
 import '../design_system/components/ui_card.dart';
@@ -9,6 +10,8 @@ import '../design_system/components/waveform_widget.dart';
 import '../design_system/components/pitch_visualizer.dart';
 import '../services/native_audio_service.dart';
 import '../services/dual_engine_service.dart';
+import '../services/realtime_pitch_stream.dart';
+import '../widgets/session_report.dart';
 import '../theme/pitch_colors.dart';
 
 enum RecordingStep { 
@@ -65,6 +68,8 @@ class _ShadcnRecordingModalState extends State<ShadcnRecordingModal>
   // 타이머
   Timer? _recordingTimer;
   Timer? _waveformTimer;
+  RealtimePitchStream? _rtStream;
+  StreamSubscription<RealtimePitchEvent>? _rtSub;
   
   @override
   void initState() {
@@ -120,6 +125,8 @@ class _ShadcnRecordingModalState extends State<ShadcnRecordingModal>
   
   @override
   void dispose() {
+    _rtSub?.cancel();
+    _rtStream?.stop();
     _recordingTimer?.cancel();
     _waveformTimer?.cancel();
     _stepController.dispose();
@@ -150,22 +157,23 @@ class _ShadcnRecordingModalState extends State<ShadcnRecordingModal>
       _recordingController.repeat(reverse: true);
       _stepController.forward();
       
-      // 녹음 시간 타이머
-      _recordingTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-        if (!mounted) {
-          timer.cancel();
-          return;
+      // 실시간 피치 스트림 시작 (가능 시)
+      try {
+        final recorded = await _audioService.getRecordedAudio();
+        if (recorded != null && recorded.isNotEmpty) {
+          _rtStream = RealtimePitchStream();
+          _rtSub = _rtStream!.stream.listen((ev) {
+            if (!mounted || !_isRecording) return;
+            setState(() {
+              _currentPitch = ev.frequency;
+              _confidence = ev.confidence;
+              _recordingTime = ev.timeSec;
+              _averageAccuracy = _calculateAccuracy(ev.frequency);
+            });
+          });
+          unawaited(_rtStream!.start(Float32List.fromList(recorded), sampleRate: 48000.0));
         }
-        
-        setState(() {
-          _recordingTime += 0.1;
-        });
-        
-        // 최대 10초 녹음
-        if (_recordingTime >= 10.0) {
-          _stopRecording();
-        }
-      });
+      } catch (_) {}
       
     } catch (e) {
       print('녹음 시작 실패: $e');
@@ -176,6 +184,8 @@ class _ShadcnRecordingModalState extends State<ShadcnRecordingModal>
   void _stopRecording() async {
     _recordingTimer?.cancel();
     _recordingController.stop();
+    _rtSub?.cancel();
+    _rtStream?.stop();
     
     try {
       await _audioService.stopRecording();
@@ -205,7 +215,10 @@ class _ShadcnRecordingModalState extends State<ShadcnRecordingModal>
     
     try {
       // CREPE/SPICE 분석
-      final results = await _engineService.analyzeTimeBasedPitch(_audioData);
+      final results = await _engineService.analyzeTimeBasedPitch(
+        _audioData,
+        useHMM: true,
+      );
       
       if (results.isNotEmpty) {
         // 분석 결과 처리
@@ -592,6 +605,12 @@ class _ShadcnRecordingModalState extends State<ShadcnRecordingModal>
           ),
           
           const SizedBox(height: DesignTokens.space6),
+
+          // 세션 요약 리포트
+          if (_pitchData.isNotEmpty) ...[
+            SessionReport(frames: _pitchData),
+            const SizedBox(height: DesignTokens.space6),
+          ],
           
           // 액션 버튼들
           UIButton(

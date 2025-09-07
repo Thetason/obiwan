@@ -1460,6 +1460,7 @@ class _FixedVocalTrainingScreenState extends State<FixedVocalTrainingScreen>
           audioFloat32,
           windowSize: 4096,  // 더 큰 윈도우
           hopSize: 2048,     // 더 큰 hop (적은 분석 횟수)
+          useHMM: true,
         );
         
         if (mounted && dualResults.isNotEmpty) {

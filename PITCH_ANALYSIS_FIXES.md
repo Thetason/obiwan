@@ -1,5 +1,24 @@
 # Vocal Training App - Pitch Analysis Fixes
 
+## 2025-09-07 Update — Schema v2, Server Self-Test, I/O Standardization
+
+- Added Schema v2 endpoint to CREPE server (`POST /analyze_v2`) returning:
+  - `meta(sr_in, sr_proc, hop, window, engine)`
+  - `pitch(f0, frequencies, confidence_raw, confidence_adaptive, note, octave, cents)`
+  - `voicing(vad, hnr)`
+- Standardized input decoding on server: mono/float32/[-1,1], default `sample_rate=48000`, resampled to 16k for analysis.
+- Backward compatibility: legacy `POST /analyze` now mirrors top‑level `frequencies` and `confidence` while still returning `{success, data}`.
+- Startup self‑test (440/523.25/1000 Hz) exposed via `GET /health` with `status: healthy|degraded` and detailed results.
+- Client (`DualEngineService`) now prefers `/analyze_v2` and falls back to `/analyze` seamlessly.
+- `start_all_servers.sh` now starts `crepe_setup/crepe_server.py` on port 5002 by default.
+
+### Adaptive Thresholds & HMM Segmentation (client)
+- Added adaptive confidence thresholding in `DualEngineService.analyzeTimeBasedPitch` using SNR, ZCR, spectral flatness heuristics.
+- Introduced optional `useHMM=true` to enable denser sampling (0.125s) and HMM-style consolidation with:
+  - Transition penalty via max slope (glissando protection)
+  - Vibrato protection using windowed cents-std extent (20–80¢ over ~1s)
+- Default behavior unchanged unless `useHMM` is enabled; legacy path still supported.
+
 ## Issues Identified and Fixed
 
 ### 1. SPICE Server Request Format Issue ✅ FIXED

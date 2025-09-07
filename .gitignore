@@ -43,3 +43,16 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+# Ignore local env and generated models
+.venv/
+.venv311/
+vendor/
+# Generated CoreML/TFLite artifacts (regenerate via scripts)
+ios/Runner/Models/*
+!ios/Runner/Models/.gitkeep
+macos/Runner/Models/*
+!macos/Runner/Models/.gitkeep
+
+# Python caches
+**/__pycache__/
+

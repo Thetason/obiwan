@@ -208,6 +208,7 @@ class _VJRecordingFlowState extends State<VJRecordingFlow>
         windowSize: 4096,   // Smaller window for faster processing
         hopSize: 2048,      // 50% overlap
         sampleRate: 48000.0,
+        useHMM: true,
       );
       
       print('✅ Got ${results.length} pitch results from AI');

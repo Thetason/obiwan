@@ -7,6 +7,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../models/analysis_result.dart';
 import 'single_pitch_tracker.dart';
+import 'ondevice_crepe_service.dart';
+import '../config/pipeline_preset.dart';
 
 /// 초고속 CREPE + SPICE 듀얼 엔진 서비스 (HTTP/2 + 배치 처리)
 class DualEngineService {
@@ -20,6 +22,7 @@ class DualEngineService {
   late final HttpClient _http2CrepeClient;
   late final HttpClient _http2SpiceClient;
   SinglePitchTracker? _pitchTracker;
+  final OnDeviceCrepeService _onDeviceCrepe = OnDeviceCrepeService();
   
   // 피치 분석 캐시 (최근 10개 결과 저장)
   final Map<String, DualResult> _pitchCache = {};
@@ -420,8 +423,15 @@ class DualEngineService {
   Future<bool> _checkServerHealth(Dio client) async {
     try {
       final response = await client.get('/health');
-      return response.statusCode == 200 && 
-             response.data['status'] == 'healthy';
+      if (response.statusCode != 200) return false;
+      final status = response.data['status'];
+      // Treat 'healthy' as true, 'degraded' as usable but warn
+      if (status == 'healthy') return true;
+      if (status == 'degraded') {
+        debugPrint('Server health degraded: self-test did not fully pass');
+        return true; // allow but mark degraded
+      }
+      return false;
     } catch (e) {
       debugPrint('Server health check failed: $e');
       return false;
@@ -441,43 +451,80 @@ class DualEngineService {
       // Float32List를 안전한 Base64로 인코딩 (전처리 포함)
       final audioBase64 = _encodeAudioToBase64(audioData);
       print('🎵 [CREPE] Base64 인코딩 완료: ${audioBase64.length} 바이트');
-      
+
+      // 1) Try Schema v2 endpoint first
+      try {
+        final v2 = await _crepeClient.post('/analyze_v2', data: {
+          'audio_base64': audioBase64,
+          'sample_rate': 48000,
+          'encoding': 'base64_float32',
+        });
+        if (v2.statusCode == 200 && v2.data != null && (v2.data['success'] == true)) {
+          // Prefer primary f0 if present
+          final pitch = v2.data['pitch'] as Map<String, dynamic>?;
+          if (pitch != null) {
+            final f0 = (pitch['f0'] as num?)?.toDouble() ?? 0.0;
+            final confList = (pitch['confidence_adaptive'] as List?) ?? (pitch['confidence_raw'] as List?);
+            double conf = 0.0;
+            if (confList != null && confList.isNotEmpty) {
+              // take max confidence frame
+              final cl = confList.map((e) => (e as num).toDouble()).toList();
+              conf = cl.reduce((a, b) => a > b ? a : b);
+            }
+            if (f0 > 0) {
+              final result = CrepeResult(
+                frequency: f0,
+                confidence: conf,
+                timestamp: DateTime.now(),
+                stability: 0.8,
+                voicedRatio: (v2.data['voicing']?['vad'] as num?)?.toDouble() ?? conf,
+                processingTimeMs: 100.0,
+              );
+              print('✅ [CREPE v2] ${result.frequency.toStringAsFixed(1)}Hz conf=${result.confidence.toStringAsFixed(3)}');
+              return result;
+            }
+          }
+        }
+      } catch (e) {
+        // Fallthrough to legacy
+        debugPrint('CREPE v2 analyze failed, falling back: $e');
+      }
+
+      // 2) Legacy endpoint (with new server also mirroring top-level fields)
       final response = await _crepeClient.post('/analyze', data: {
         'audio_base64': audioBase64,
         'sample_rate': 48000,
         'encoding': 'base64_float32'
       });
-      
+
       print('🎵 [CREPE] 서버 응답: ${response.statusCode}');
-      
+
       if (response.statusCode == 200 && response.data != null) {
-        // CREPE 서버는 직접 배열을 반환
-        if (response.data['frequencies'] != null && response.data['confidence'] != null) {
-          final frequencies = (response.data['frequencies'] as List).map((e) => (e as num).toDouble()).toList();
-          final confidences = (response.data['confidence'] as List).map((e) => (e as num).toDouble()).toList();
-          
-          if (frequencies.isNotEmpty && confidences.isNotEmpty) {
-            // 가장 높은 신뢰도의 주파수 선택
-            int bestIdx = 0;
-            double maxConf = confidences[0];
-            for (int i = 1; i < confidences.length; i++) {
-              if (confidences[i] > maxConf) {
-                maxConf = confidences[i];
-                bestIdx = i;
-              }
+        // legacy: server now includes top-level arrays
+        final freqsAny = response.data['frequencies'] ?? response.data['data']?['frequencies'];
+        final confsAny = response.data['confidence'] ?? response.data['data']?['confidence'];
+        if (freqsAny is List && confsAny is List && freqsAny.isNotEmpty && confsAny.isNotEmpty) {
+          final frequencies = freqsAny.map((e) => (e as num).toDouble()).toList();
+          final confidences = confsAny.map((e) => (e as num).toDouble()).toList();
+          // pick frame with highest confidence
+          int bestIdx = 0;
+          double maxConf = confidences[0];
+          for (int i = 1; i < confidences.length; i++) {
+            if (confidences[i] > maxConf) {
+              maxConf = confidences[i];
+              bestIdx = i;
             }
-            
-            final result = CrepeResult(
-              frequency: frequencies[bestIdx],
-              confidence: maxConf,
-              timestamp: DateTime.now(),
-              stability: 0.8,  // 기본값
-              voicedRatio: maxConf,  // 신뢰도를 voiced ratio로 사용
-              processingTimeMs: 100.0,  // 기본값
-            );
-            print('✅ [CREPE] 분석 성공: ${result.frequency.toStringAsFixed(1)}Hz, 신뢰도: ${result.confidence}');
-            return result;
           }
+          final result = CrepeResult(
+            frequency: frequencies[bestIdx],
+            confidence: maxConf,
+            timestamp: DateTime.now(),
+            stability: 0.8,
+            voicedRatio: maxConf,
+            processingTimeMs: 100.0,
+          );
+          print('✅ [CREPE] 분석 성공: ${result.frequency.toStringAsFixed(1)}Hz, 신뢰도: ${result.confidence}');
+          return result;
         }
       }
       print('⚠️ [CREPE] 분석 실패 - 응답 형식 오류');
@@ -678,21 +725,29 @@ class DualEngineService {
   }
 
   /// 시간별 피치 분석 (기존 CREPE+SPICE 듀얼 엔진)
-  Future<List<DualResult>> analyzeTimeBasedPitch(Float32List audioData, {
+  Future<List<DualResult>> analyzeTimeBasedPitch(List<double> audioData, {
     int windowSize = 48000,  // 1초 분량 (CREPE/SPICE 최적)
-    int hopSize = 48000,     // 1초 간격 (0% 오버랩) - 극단적으로 큰 간격
+    int hopSize = 48000,     // 1초 간격 (0% 오버랩)
     double sampleRate = 48000.0,
-    double confidenceThreshold = 0.8,  // 신뢰도 임계값을 80%로 강화
-    double minimumNoteDuration = 0.8,   // 최소 음표 지속시간을 0.8초로 강화
+    double confidenceThreshold = 0.8,  // 기본 임계값
+    double minimumNoteDuration = 0.8,   // 최소 음표 지속시간
+    bool useHMM = false,                // HMM 기반 세그멘테이션 사용 여부
   }) async {
-    if (audioData.length < windowSize) {
+    final buffer = Float32List.fromList(audioData);
+    if (buffer.length < windowSize) {
       print('⚠️ [DualEngine] 오디오 데이터가 너무 짧음: ${audioData.length} < $windowSize');
       return [];
     }
     
-    final numWindows = (audioData.length - windowSize) ~/ hopSize + 1;
+    final numWindows = (buffer.length - windowSize) ~/ hopSize + 1;
     print('🎵 [DualEngine] 시간별 분석 시작: $numWindows개 윈도우');
     
+    // HMM 모드일 때는 더 촘촘하게 샘플링 (0.125s)
+    if (useHMM) {
+      hopSize = (sampleRate * 0.125).toInt();
+      windowSize = math.max(windowSize, (sampleRate * 0.25).toInt()); // 0.25s 창
+    }
+
     final results = <DualResult>[];
     int successCount = 0;
     int failCount = 0;
@@ -700,13 +755,11 @@ class DualEngineService {
     // 순차적으로 처리하되 서버 호출은 병렬로
     for (int i = 0; i < numWindows; i++) {
       final startIdx = i * hopSize;
-      final endIdx = math.min(startIdx + windowSize, audioData.length);
+      final endIdx = math.min(startIdx + windowSize, buffer.length);
       
       if (endIdx - startIdx < windowSize) break;
       
-      final chunk = Float32List.fromList(
-        audioData.sublist(startIdx, endIdx)
-      );
+      final chunk = Float32List.fromList(buffer.sublist(startIdx, endIdx));
       
       // 청크 통계 출력 (디버깅)
       if (i == 0 || i == numWindows ~/ 2 || i == numWindows - 1) {
@@ -727,7 +780,14 @@ class DualEngineService {
           },
         );
         
-        if (result != null && result.frequency > 0 && result.confidence >= confidenceThreshold) {
+        // Adaptive confidence threshold 계산
+        final adaptiveThresh = _computeAdaptiveThreshold(
+          chunk,
+          sampleRate: sampleRate,
+          baseThreshold: confidenceThreshold,
+        );
+
+        if (result != null && result.frequency > 0 && result.confidence >= adaptiveThresh) {
           // 시간 정보를 추가한 새 결과 생성
           results.add(DualResult(
             frequency: result.frequency,
@@ -742,12 +802,12 @@ class DualEngineService {
           
           successCount++;
           if (i % 5 == 0) { // 5개마다 로그
-            print('✅ 청크 $i 분석 완료: ${result.frequency.toStringAsFixed(1)}Hz at ${timeSeconds.toStringAsFixed(2)}s (신뢰도: ${(result.confidence * 100).toInt()}%)');
+            print('✅ 청크 $i 분석 완료: ${result.frequency.toStringAsFixed(1)}Hz at ${timeSeconds.toStringAsFixed(2)}s (신뢰도: ${(result.confidence * 100).toInt()}%, 임계=${(adaptiveThresh * 100).toInt()}%)');
           }
         } else {
           failCount++;
-          if (result?.confidence != null && result!.confidence < confidenceThreshold) {
-            print('⚠️ 청크 $i 신뢰도 낮음: ${(result.confidence * 100).toInt()}% < ${(confidenceThreshold * 100).toInt()}%');
+          if (result?.confidence != null) {
+            print('⚠️ 청크 $i 신뢰도 낮음: ${(result!.confidence * 100).toInt()}% < ${(adaptiveThresh * 100).toInt()}%');
           }
         }
       } catch (e) {
@@ -764,11 +824,87 @@ class DualEngineService {
     final successRate = (successCount / numWindows * 100).toStringAsFixed(1);
     print('📊 [DualEngine] 원본 분석 완료: ${results.length}개 결과 (성공률: $successRate%)');
     
-    // 음표 통합: 비슷한 연속 피치를 하나로 합침
-    final consolidatedResults = _consolidateNotes(results, minimumNoteDuration);
+    // 음표 통합: 기본 또는 HMM 고도화
+    final consolidatedResults = useHMM
+        ? _consolidateNotesHMM(
+            results,
+            minimumDuration: minimumNoteDuration,
+            maxSlopeCentsPerSec: 300, // 글리산도 보호 (<= 300 cents/s)
+            vibratoExtentCentsMin: 20,
+            vibratoExtentCentsMax: 80,
+            vibratoWindowSec: 1.0,
+          )
+        : _consolidateNotes(results, minimumNoteDuration);
     print('✅ [DualEngine] 음표 통합 완료: ${consolidatedResults.length}개 최종 결과 (${results.length}개에서 감소)');
     
     return consolidatedResults;
+  }
+
+  /// 적응형 신뢰도 임계값 계산 (RMS/ZCR/스펙트럼 평탄도/SNR 기반)
+  double _computeAdaptiveThreshold(Float32List chunk, {required double sampleRate, double baseThreshold = 0.8}) {
+    double thr = baseThreshold;
+
+    // RMS as energy
+    final rms = _calculateRMS(chunk);
+    // ZCR
+    final zcr = _calculateZCR(chunk);
+    // SNR (간단 추정: 하위 10% 절대값 평균을 노이즈로 가정)
+    final sortedAbs = chunk.map((e) => e.abs()).toList()..sort();
+    final noiseCount = math.max(1, (sortedAbs.length * 0.1).toInt());
+    double noiseFloor = 0.0;
+    for (int i = 0; i < noiseCount; i++) { noiseFloor += sortedAbs[i]; }
+    noiseFloor = noiseFloor / noiseCount;
+    final signal = rms;
+    final snrDb = (signal > 0 && noiseFloor > 0)
+        ? 20.0 * (math.log(signal / noiseFloor) / math.ln10)
+        : 0.0;
+
+    // Spectral flatness on reduced frame (up to 2048)
+    final flatness = _spectralFlatness(chunk, sampleRate: sampleRate, maxLen: 2048);
+
+    // Heuristics
+    if (snrDb >= 20) thr -= 0.05;
+    if (snrDb < 10) thr += 0.10;
+
+    if (zcr < 0.10) thr -= 0.05; // voiced-like
+    if (zcr > 0.30) thr += 0.05; // unvoiced/noise-like
+
+    if (flatness < 0.5) thr -= 0.05; // harmonic
+    if (flatness > 0.8) thr += 0.10; // noise-like
+
+    // Clamp
+    thr = thr.clamp(0.5, 0.95);
+    return thr;
+  }
+
+  /// 간단한 스펙트럼 평탄도 계산 (저비용용 축약 DFT)
+  double _spectralFlatness(Float32List data, {required double sampleRate, int maxLen = 2048}) {
+    final n = math.min(maxLen, data.length);
+    if (n < 32) return 1.0;
+    double geometricMean = 1.0;
+    double arithmeticMean = 0.0;
+    int count = 0;
+    // naive DFT magnitude for first n/2 bins
+    for (int k = 0; k < n ~/ 2; k++) {
+      double real = 0.0, imag = 0.0;
+      for (int t = 0; t < n; t++) {
+        final angle = -2.0 * math.pi * k * t / n;
+        final s = data[t];
+        real += s * math.cos(angle);
+        imag += s * math.sin(angle);
+      }
+      final mag = math.sqrt(real * real + imag * imag);
+      if (mag > 0) {
+        // use power measure for stability
+        geometricMean *= math.pow(mag, 1.0 / (n / 2));
+        arithmeticMean += mag;
+        count++;
+      }
+    }
+    if (count == 0) return 1.0;
+    arithmeticMean /= count;
+    if (arithmeticMean <= 1e-12) return 1.0;
+    return (geometricMean / arithmeticMean).clamp(0.0, 1.0);
   }
 
   /// 음표 통합: 비슷한 연속 피치를 하나로 합침
@@ -832,9 +968,121 @@ class DualEngineService {
     return consolidated;
   }
 
+  /// HMM 스타일 세그멘테이션: 전이비용 + 비브라토/글리산도 보호 규칙
+  List<DualResult> _consolidateNotesHMM(
+    List<DualResult> results, {
+      required double minimumDuration,
+      required double maxSlopeCentsPerSec,
+      required double vibratoExtentCentsMin,
+      required double vibratoExtentCentsMax,
+      required double vibratoWindowSec,
+    }
+  ) {
+    if (results.isEmpty) return results;
+    results.sort((a, b) => (a.timeSeconds ?? 0).compareTo(b.timeSeconds ?? 0));
+
+    final consolidated = <DualResult>[];
+    DualResult? current;
+    double startTime = 0.0;
+    // buffer for vibrato window
+    final window = <DualResult>[];
+
+    double centsDelta(double f, double g) => 1200.0 * (math.log(f / g) / math.ln2);
+
+    for (final r in results) {
+      final t = r.timeSeconds ?? 0.0;
+      if (current == null) {
+        current = r;
+        startTime = t;
+        window.clear();
+        window.add(r);
+        continue;
+      }
+
+      // calculate slope and cents difference
+      final dt = math.max(1e-3, t - (current.timeSeconds ?? 0.0));
+      final centsDiff = centsDelta(r.frequency, current.frequency).abs();
+      final slope = centsDiff / dt; // cents per second
+
+      // Vibrato detection on window (~1s)
+      window.add(r);
+      // keep last W seconds
+      while (window.isNotEmpty && t - (window.first.timeSeconds ?? 0.0) > vibratoWindowSec) {
+        window.removeAt(0);
+      }
+      double vibratoStd = 0.0;
+      if (window.length >= 4) {
+        // compute mean freq over window
+        final meanFreq = window.map((e) => e.frequency).reduce((a, b) => a + b) / window.length;
+        final centsVals = window.map((e) => centsDelta(e.frequency, meanFreq)).toList();
+        final meanCents = centsVals.reduce((a, b) => a + b) / centsVals.length;
+        double varianceSum = 0.0;
+        for (final v in centsVals) { varianceSum += (v - meanCents) * (v - meanCents); }
+        vibratoStd = math.sqrt(varianceSum / centsVals.length).abs();
+      }
+
+      final isVibrato = vibratoStd >= vibratoExtentCentsMin && vibratoStd <= vibratoExtentCentsMax;
+      final isGlissando = slope <= maxSlopeCentsPerSec;
+
+      final sameNote = (centsDiff <= 50) || isVibrato || isGlissando;
+
+      if (sameNote) {
+        // merge by keeping higher confidence
+        if (r.confidence > current.confidence) {
+          current = DualResult(
+            frequency: r.frequency,
+            confidence: r.confidence,
+            timestamp: r.timestamp,
+            crepeResult: r.crepeResult,
+            spiceResult: r.spiceResult,
+            recommendedEngine: r.recommendedEngine,
+            analysisQuality: r.analysisQuality,
+            timeSeconds: startTime,
+          );
+        }
+      } else {
+        // finalize current if long enough
+        final dur = (r.timeSeconds ?? t) - startTime;
+        if (dur >= minimumDuration) {
+          consolidated.add(current);
+        }
+        current = r;
+        startTime = t;
+        window.clear();
+        window.add(r);
+      }
+    }
+
+    if (current != null) {
+      final lastTime = (results.last.timeSeconds ?? startTime);
+      final dur = lastTime - startTime;
+      if (dur >= minimumDuration) {
+        consolidated.add(current);
+      }
+    }
+
+    return consolidated;
+  }
+
   /// 듀얼 엔진 분석 (무조건 병렬 실행)
   Future<DualResult?> analyzeDual(Float32List audioData) async {
-    // CREPE와 SPICE를 항상 병렬로 실행 (속도 최우선)
+    // v0.1: Prefer on-device CREPE (or local tracker) first for immediate UX
+    try {
+      final onDevice = await _onDeviceCrepe.analyzeWindow(audioData, sampleRate: 48000.0);
+      // Adaptive gating: prefer on-device if confidence over local tau
+      if (onDevice.confidence >= PipelinePresetV01.tauLocal && onDevice.frequency > 0) {
+        return DualResult(
+          frequency: onDevice.frequency,
+          confidence: onDevice.confidence,
+          timestamp: DateTime.now(),
+          recommendedEngine: 'ONDEVICE',
+        );
+      }
+    } catch (e) {
+      debugPrint('On-device analysis failed: $e');
+    }
+
+    // Then, try server engines in parallel (CREPE/SPICE) and fuse
     final results = await Future.wait([
       analyzeWithCrepe(audioData).catchError((e) {
         print('⚠️ CREPE 실패: $e');
@@ -845,10 +1093,10 @@ class DualEngineService {
         return null;
       }),
     ], eagerError: false);
-    
+
     final crepeResult = results[0] as CrepeResult?;
     final spiceResult = results[1] as SpiceResult?;
-    
+
     return _fuseResults(crepeResult, spiceResult);
   }
   

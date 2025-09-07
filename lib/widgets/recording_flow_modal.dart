@@ -316,7 +316,10 @@ class _RecordingFlowModalState extends State<RecordingFlowModal>
       }
       
       // CREPE/SPICE 듀얼 엔진으로 시간별 피치 분석
-      final pitchResults = await _engineService.analyzeTimeBasedPitch(float32Data);
+      final pitchResults = await _engineService.analyzeTimeBasedPitch(
+        float32Data,
+        useHMM: true,
+      );
       
       // 음색 분석 일시적으로 비활성화 (디버깅)
       print('🎨 음색 분석 스킵 (디버깅 모드)');
