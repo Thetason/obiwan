@@ -84,6 +84,14 @@ void main() async {
   );
   
   await logger.info('오비완 v3 앱 시작 준비 완료', tag: 'MAIN');
+  // On-device CREPE self-test (non-blocking)
+  try {
+    const channel = MethodChannel('obiwan.ondevice_crepe');
+    channel.invokeMethod('selfTest').then((res) {
+      final ok = (res is Map && res['success'] == true);
+      logger.info('On-device CREPE self-test: ${ok ? 'healthy' : 'degraded'}', tag: 'MAIN');
+    }).catchError((_) {});
+  } catch (_) {}
   runApp(VocalTrainerApp(debugModeEnabled: _isDebugModeEnabled));
 }
 

@@ -1032,6 +1032,29 @@ class MainFlutterWindow: NSWindow {
         } else {
           result(["f0": 0.0, "confidence": 0.0])
         }
+      case "selfTest":
+        if #available(macOS 11.0, *) {
+          let ok = MacOnDeviceCrepeRunner.shared.loadModel()
+          var passed = false
+          if ok {
+            // simple 100ms test at 440/523/1000 Hz
+            let tones: [Double] = [440.0, 523.25, 1000.0]
+            var okc = 0
+            for f in tones {
+              let sr = 16000.0
+              let n = Int(sr * 0.1)
+              var arr = [Float](repeating: 0, count: n)
+              for i in 0..<n { arr[i] = Float(sin(2.0 * Double.pi * f * Double(i) / sr)) * 0.5 }
+              let data = arr.withUnsafeBufferPointer { Data(buffer: $0) }
+              let (f0, _) = MacOnDeviceCrepeRunner.shared.analyzeWindow(samples: data, sampleRate: sr)
+              if f0 > 0 { okc += 1 }
+            }
+            passed = okc >= 2
+          }
+          result(["success": passed])
+        } else {
+          result(["success": false])
+        }
       default:
         result(FlutterMethodNotImplemented)
       }

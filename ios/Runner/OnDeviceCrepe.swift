@@ -49,7 +49,7 @@ class OnDeviceCrepeRunner {
         }
     }
 
-    func analyzeWindow(samples: Data, sampleRate: Double) -> (Double, Double) {
+  func analyzeWindow(samples: Data, sampleRate: Double) -> (Double, Double) {
         guard #available(iOS 13.0, *), let model = model, let inputName = inputName else {
             return (0.0, 0.0)
         }
@@ -72,8 +72,24 @@ class OnDeviceCrepeRunner {
                 }
             } catch {
                 print("[OnDeviceCREPE] prediction failed: \(error)")
-            }
-        }
+  }
+
+  func selfTest() -> Bool {
+    // Generate 100ms 16kHz sine for a few test tones and verify non-zero f0
+    let testHz: [Double] = [440.0, 523.25, 1000.0]
+    var okCount = 0
+    for f in testHz {
+      let sr = 16000.0
+      let n = Int(sr * 0.1)
+      var arr = [Float](repeating: 0, count: n)
+      for i in 0..<n { arr[i] = Float(sin(2.0 * Double.pi * f * Double(i) / sr)) * 0.5 }
+      let data = arr.withUnsafeBufferPointer { Data(buffer: $0) }
+      let (f0, _) = analyzeWindow(samples: data, sampleRate: sr)
+      if f0 > 0 { okCount += 1 }
+    }
+    return okCount >= 2
+  }
+}
         return (f0, conf)
     }
 

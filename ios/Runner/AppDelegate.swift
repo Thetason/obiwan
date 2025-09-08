@@ -36,6 +36,17 @@ import UIKit
         } else {
           result(["f0": 0.0, "confidence": 0.0])
         }
+      case "selfTest":
+        if #available(iOS 13.0, *) {
+          let ok = OnDeviceCrepeRunner.shared.loadModel()
+          var passed = false
+          if ok {
+            passed = OnDeviceCrepeRunner.shared.selfTest()
+          }
+          result(["success": passed])
+        } else {
+          result(["success": false])
+        }
       default:
         result(FlutterMethodNotImplemented)
       }
