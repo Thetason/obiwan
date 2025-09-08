@@ -20,6 +20,9 @@ import 'package:dio/dio.dart';
 
 // 디버그 모드 플래그 (앱 인자나 환경변수로 제어 가능)
 bool _isDebugModeEnabled = kDebugMode;
+// SAFE_MODE can be controlled via:  --dart-define=SAFE_MODE=true/false
+const String _kSafeModeStr = String.fromEnvironment('SAFE_MODE', defaultValue: 'true');
+final bool _SAFE_MODE = _kSafeModeStr.toLowerCase() == 'true';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,30 +43,28 @@ void main() async {
   errorHandler.initialize();
   await logger.info('에러 핸들러 초기화 완료', tag: 'MAIN');
   
-  // 🛡️ 안정성 시스템 초기화
-  print('🛡️ 안정성 시스템 초기화 중...');
-  
-  // 크래시 리포터 초기화
-  await CrashReporter().initialize(
-    onRecoveryAttempt: () async {
-      // 복구 시도 시 실행할 콜백
-      print('🔄 앱 복구 시도 중...');
-      await ResourceManager().disposeAll();
-      await Future.delayed(const Duration(seconds: 1));
-    },
-  );
-  await logger.info('크래시 리포터 초기화 완료', tag: 'MAIN');
-  
-  // 리소스 매니저 모니터링 시작
-  ResourceManager().startMonitoring();
-  await logger.info('리소스 매니저 모니터링 시작', tag: 'MAIN');
-  
-  // 복구 시스템 초기화
-  await ResilienceManager().initialize(
-    dualEngineService: DualEngineService(),
-    nativeAudioService: NativeAudioService.instance,
-  );
-  await logger.info('복구 시스템 초기화 완료', tag: 'MAIN');
+  if (!_SAFE_MODE) {
+    // 🛡️ 안정성 시스템 초기화
+    print('🛡️ 안정성 시스템 초기화 중...');
+    // 크래시 리포터 초기화
+    await CrashReporter().initialize(
+      onRecoveryAttempt: () async {
+        print('🔄 앱 복구 시도 중...');
+        await ResourceManager().disposeAll();
+        await Future.delayed(const Duration(seconds: 1));
+      },
+    );
+    await logger.info('크래시 리포터 초기화 완료', tag: 'MAIN');
+    // 리소스 매니저 모니터링 시작
+    ResourceManager().startMonitoring();
+    await logger.info('리소스 매니저 모니터링 시작', tag: 'MAIN');
+    // 복구 시스템 초기화
+    await ResilienceManager().initialize(
+      dualEngineService: DualEngineService(),
+      nativeAudioService: NativeAudioService.instance,
+    );
+    await logger.info('복구 시스템 초기화 완료', tag: 'MAIN');
+  }
   
   // 네이티브 오디오 서비스 초기화
   await NativeAudioService.instance.initialize();
@@ -84,14 +85,16 @@ void main() async {
   );
   
   await logger.info('오비완 v3 앱 시작 준비 완료', tag: 'MAIN');
-  // On-device CREPE self-test (non-blocking)
-  try {
-    const channel = MethodChannel('obiwan.ondevice_crepe');
-    channel.invokeMethod('selfTest').then((res) {
-      final ok = (res is Map && res['success'] == true);
-      logger.info('On-device CREPE self-test: ${ok ? 'healthy' : 'degraded'}', tag: 'MAIN');
-    }).catchError((_) {});
-  } catch (_) {}
+  if (!_SAFE_MODE) {
+    // On-device CREPE self-test (non-blocking)
+    try {
+      const channel = MethodChannel('obiwan.ondevice_crepe');
+      channel.invokeMethod('selfTest').then((res) {
+        final ok = (res is Map && res['success'] == true);
+        logger.info('On-device CREPE self-test: ${ok ? 'healthy' : 'degraded'}', tag: 'MAIN');
+      }).catchError((_) {});
+    } catch (_) {}
+  }
   runApp(VocalTrainerApp(debugModeEnabled: _isDebugModeEnabled));
 }
 
@@ -201,7 +204,8 @@ class _VocalTrainerAppState extends State<VocalTrainerApp> {
           ),
         ),
       ),
-      initialRoute: '/vj_home',  // Start with new Voice Journey UI
+      // In safe mode, start with root screen to avoid heavy init
+      initialRoute: _SAFE_MODE ? '/' : '/vj_home',
       routes: {
         '/': (context) => const VocalAppScreen(),  // Keep existing for compatibility
         '/vj_home': (context) => const VJHomeScreen(),  // New Voice Journey home
@@ -213,7 +217,7 @@ class _VocalTrainerAppState extends State<VocalTrainerApp> {
     );
 
     // 🔧 디버그 모드에서만 DebugDashboard로 감싸기
-    if (widget.debugModeEnabled && !kReleaseMode) {
+    if (widget.debugModeEnabled && !kReleaseMode && !_SAFE_MODE) {
       return DebugDashboard(
         enabled: true,
         // 오디오 스트림은 나중에 실제 오디오 서비스에서 가져올 수 있음
