@@ -11,6 +11,7 @@ import '../design_system/components/pitch_visualizer.dart';
 import '../services/native_audio_service.dart';
 import '../services/dual_engine_service.dart';
 import '../services/realtime_pitch_stream.dart';
+import '../core/dev_diagnostics.dart';
 import '../widgets/session_report.dart';
 import '../theme/pitch_colors.dart';
 
@@ -613,6 +614,27 @@ class _ShadcnRecordingModalState extends State<ShadcnRecordingModal>
           ],
           
           // 액션 버튼들
+          Row(
+            children: [
+              Expanded(
+                child: UIButton(
+                  text: 'Export Diagnostics',
+                  variant: ButtonVariant.ghost,
+                  size: ButtonSize.md,
+                  fullWidth: true,
+                  onPressed: () async {
+                    final path = await DevDiagnostics.export();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(path != null ? 'Exported: $path' : 'Export failed')),
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: DesignTokens.space4),
           UIButton(
             text: 'Record Again',
             variant: ButtonVariant.outline,

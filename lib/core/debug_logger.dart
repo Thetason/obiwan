@@ -19,6 +19,7 @@ class DebugLogger {
   DebugLogger._();
 
   File? _logFile;
+  File? _devMirrorFile; // mirrors logs into repo for external analysis
   bool _isInitialized = false;
 
   /// 로거 초기화 - 앱 시작시 호출 필요
@@ -33,6 +34,20 @@ class DebugLogger {
       
       final timestamp = DateTime.now().toIso8601String().split('T')[0];
       _logFile = File('${logDirectory.path}/vocal_trainer_$timestamp.log');
+      
+      // Dev mirror: write also to ~/obiwan/.devlogs/latest.log so external tools can read
+      try {
+        final home = Platform.environment['HOME'] ?? '';
+        if (home.isNotEmpty) {
+          final devDir = Directory('$home/obiwan/.devlogs');
+          if (!await devDir.exists()) {
+            await devDir.create(recursive: true);
+          }
+          _devMirrorFile = File('${devDir.path}/latest.log');
+        }
+      } catch (_) {
+        _devMirrorFile = null;
+      }
       
       _isInitialized = true;
       await _writeToFile('🚀 [INIT] Debug Logger initialized at ${DateTime.now()}');
@@ -142,6 +157,9 @@ class DebugLogger {
     
     try {
       await _logFile!.writeAsString('$message\n', mode: FileMode.append);
+      if (_devMirrorFile != null) {
+        await _devMirrorFile!.writeAsString('$message\n', mode: FileMode.append);
+      }
     } catch (e) {
       print('❌ Failed to write log to file: $e');
     }
