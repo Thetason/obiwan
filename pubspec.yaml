@@ -12,6 +12,7 @@ dependencies:
   
   # HTTP 클라이언트 (CREPE + SPICE 서버 통신)
   dio: ^5.3.2
+  http: ^1.2.1
   
   # 오디오 처리
   flutter_sound: ^9.28.0

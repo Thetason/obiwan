@@ -1,12 +1,10 @@
 import 'dart:typed_data';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-import 'dual_engine_service.dart';
 
 /// 단일 음정 정확 추적 시스템
 /// 목표: 단선 멜로디를 99% 정확도로 캐치
 class SinglePitchTracker {
-  final DualEngineService _dualEngine = DualEngineService();
   
   // 이동 평균 필터 (노이즈 제거)
   final List<double> _pitchHistory = [];
@@ -143,24 +141,10 @@ class SinglePitchTracker {
   
   /// CREPE를 통한 피치 검출 (GPU 최적화 버전)
   Future<double> _detectWithCREPE(Float32List audio, double sampleRate) async {
-    try {
-      print('🎯 [CREPE] GPU 최적화 CREPE 분석 시작');
-      final stopwatch = Stopwatch()..start();
-      
-      // CREPE 서버로 요청
-      final result = await _dualEngine.analyzeSingleWithCREPE(
-        audio,
-        sampleRate: sampleRate,
-      );
-      
-      stopwatch.stop();
-      print('🎯 [CREPE] 분석 완료: ${result.toStringAsFixed(1)}Hz (${stopwatch.elapsedMilliseconds}ms)');
-      
-      return result;
-    } catch (e) {
-      print('⚠️ [CREPE] 분석 실패, YIN으로 폴백: $e');
-      return 0; // CREPE 실패시 0 반환 (다른 알고리즘 사용)
-    }
+    // 순환 의존성(DualEngineService ↔ OnDeviceCrepeService ↔ SinglePitchTracker) 방지를 위해
+    // SinglePitchTracker에서는 서버 호출을 하지 않습니다. 상위 레이어에서 CREPE를 사용하세요.
+    // 여기서는 로컬 알고리즘(YIN/Autocorr)과 융합만 담당합니다.
+    return 0;
     
     /* 이전 주석 코드
     try {

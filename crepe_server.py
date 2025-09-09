@@ -20,6 +20,21 @@ import struct
 app = Flask(__name__)
 CORS(app)
 
+# Optional lightweight self-test cached at startup
+_SELFTEST = {"status": "unknown", "detail": None}
+if os.environ.get("DISABLE_SELFTEST", "0") != "1":
+    try:
+        import numpy as _np
+        # 160 Hz sine for 0.1s at 16kHz, should be in vocal range
+        sr = 16000
+        t = _np.arange(0, int(0.1 * sr)) / sr
+        x = _np.sin(2 * _np.pi * 160.0 * t).astype(_np.float32)
+        _ = crepe.predict(x, sr, viterbi=False, verbose=0)
+        _SELFTEST["status"] = "pass"
+    except Exception as e:
+        _SELFTEST["status"] = "fail"
+        _SELFTEST["detail"] = str(e)
+
 # CREPE 모델 사전 로드 (첫 요청 지연 방지)
 print("CREPE 모델 로딩 중...")
 _ = crepe.predict(np.zeros(16000), 16000, viterbi=False, verbose=0)
@@ -28,12 +43,36 @@ print("CREPE 모델 로드 완료!")
 @app.route('/health', methods=['GET'])
 def health():
     """서버 상태 확인"""
+    status = 'healthy' if _SELFTEST.get('status') == 'pass' else 'degraded'
     return jsonify({
-        'status': 'healthy',
+        'status': status,
         'model': 'CREPE',
         'version': '1.0.0',
-        'description': 'Convolutional Representation for Pitch Estimation'
+        'description': 'Convolutional Representation for Pitch Estimation',
+        'selftest': _SELFTEST
     })
+
+def _quantize_notes(frequencies: np.ndarray):
+    """Quantize Hz to nearest tempered note names and rounded Hz."""
+    if frequencies is None or len(frequencies) == 0:
+        return [], []
+    A4 = 440.0
+    C0 = A4 * (2 ** -4.75)
+    note_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    q_freqs = []
+    q_notes = []
+    for f in frequencies:
+        if f <= 0 or np.isnan(f):
+            q_freqs.append(0.0)
+            q_notes.append("Rest")
+            continue
+        n = int(round(12 * np.log2(f / C0)))
+        note = note_names[n % 12] + str(n // 12)
+        qf = C0 * (2 ** (n / 12))
+        q_freqs.append(float(qf))
+        q_notes.append(note)
+    return q_freqs, q_notes
+
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
@@ -148,15 +187,29 @@ def analyze():
                 'num_frames': len(frequency)
             }
         
-        # 결과 반환
-        return jsonify({
-            'pitches': frequency.tolist(),
-            'confidences': confidence.tolist(),
+        # 양자화된 음/주파수 생성 (클라이언트 호환성 향상)
+        quantized_freqs, quantized_notes = _quantize_notes(frequency)
+
+        # 클라이언트(Dart)가 기대하는 키로 미러링 (backward compat)
+        response_legacy = {
+            # legacy keys used by some client paths
+            'frequencies': frequency.tolist(),
+            'confidence': confidence.tolist(),
+            # additional helpful fields
             'timestamps': time.tolist(),
+            'notes': quantized_notes,
+            'quantized_frequencies': quantized_freqs,
             'statistics': statistics,
             'sample_rate': 16000,
             'model': 'CREPE-full',
             'step_size_ms': 10
+        }
+
+        # 신규 스키마를 data 아래로 래핑
+        return jsonify({
+            'success': True,
+            'data': response_legacy,
+            **response_legacy
         })
         
     except Exception as e:
@@ -284,7 +337,7 @@ if __name__ == '__main__':
     print("=" * 50)
     print("엔드포인트:")
     print("  GET  /health          - 서버 상태")
-    print("  POST /analyze         - 피치 분석")
+    print("  POST /analyze         - 피치 분석 (legacy + wrapped)")
     print("  POST /analyze_chunked - 청크 단위 분석")
     print("=" * 50)
     

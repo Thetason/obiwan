@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# AI Vocal Training - 전체 서버 시작 스크립트
+#!/bin/bash
+
+# AI Vocal Training - 전체 서버 시작 스크립트 (Docker 우선)
 # CREPE, SPICE, Formant 서버 모두 실행
 
 echo "🎵 AI Vocal Training 서버 시작"
@@ -14,8 +16,8 @@ BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
-# 서버 디렉토리
-SERVER_DIR="/Users/seoyeongbin/vocal_trainer_ai"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SERVER_DIR="$SCRIPT_DIR"
 
 # PID 파일 경로
 PID_DIR="/tmp/vocal_trainer"
@@ -28,27 +30,36 @@ pkill -f "spice_server.py" 2>/dev/null
 pkill -f "formant_server.py" 2>/dev/null
 sleep 2
 
-# CREPE 서버 시작 (포트 5002)
-echo -e "${BLUE}[1/3] CREPE 서버 시작 (포트 5002)...${NC}"
-cd $SERVER_DIR
-python3 crepe_server.py > /tmp/crepe_server.log 2>&1 &
-CREPE_PID=$!
-echo $CREPE_PID > $PID_DIR/crepe.pid
-echo -e "${GREEN}✓ CREPE 서버 시작됨 (PID: $CREPE_PID)${NC}"
+if command -v docker >/dev/null 2>&1; then
+  echo -e "${BLUE}Docker 감지됨: docker-compose로 서버 기동${NC}"
+  cd "$SERVER_DIR"
+  docker compose up -d --build
+  echo -e "${GREEN}✓ Docker 컨테이너 기동 완료${NC}"
+else
+  echo -e "${YELLOW}Docker 미설치: 로컬 파이썬으로 서버 기동${NC}"
+  if [ -f "venv311/bin/activate" ]; then source venv311/bin/activate; elif [ -f "venv/bin/activate" ]; then source venv/bin/activate; fi
+  # CREPE
+  echo -e "${BLUE}[1/3] CREPE 서버 시작 (포트 5002)...${NC}"
+  cd "$SERVER_DIR"
+  python3 crepe_server.py > /tmp/crepe_server.log 2>&1 &
+  CREPE_PID=$!
+  echo $CREPE_PID > $PID_DIR/crepe.pid
+  echo -e "${GREEN}✓ CREPE 서버 시작됨 (PID: $CREPE_PID)${NC}"
 
-# SPICE 서버 시작 (포트 5003)
-echo -e "${BLUE}[2/3] SPICE 서버 시작 (포트 5003)...${NC}"
-python3 spice_server.py > /tmp/spice_server.log 2>&1 &
-SPICE_PID=$!
-echo $SPICE_PID > $PID_DIR/spice.pid
-echo -e "${GREEN}✓ SPICE 서버 시작됨 (PID: $SPICE_PID)${NC}"
+  # SPICE
+  echo -e "${BLUE}[2/3] SPICE 서버 시작 (포트 5003)...${NC}"
+  python3 spice_server.py > /tmp/spice_server.log 2>&1 &
+  SPICE_PID=$!
+  echo $SPICE_PID > $PID_DIR/spice.pid
+  echo -e "${GREEN}✓ SPICE 서버 시작됨 (PID: $SPICE_PID)${NC}"
 
-# Formant 서버 시작 (포트 5004)
-echo -e "${PURPLE}[3/3] Formant 서버 시작 (포트 5004)...${NC}"
-python3 formant_server.py > /tmp/formant_server.log 2>&1 &
-FORMANT_PID=$!
-echo $FORMANT_PID > $PID_DIR/formant.pid
-echo -e "${GREEN}✓ Formant 서버 시작됨 (PID: $FORMANT_PID)${NC}"
+  # Formant
+  echo -e "${PURPLE}[3/3] Formant 서버 시작 (포트 5004)...${NC}"
+  python3 formant_server.py > /tmp/formant_server.log 2>&1 &
+  FORMANT_PID=$!
+  echo $FORMANT_PID > $PID_DIR/formant.pid
+  echo -e "${GREEN}✓ Formant 서버 시작됨 (PID: $FORMANT_PID)${NC}"
+fi
 
 # 서버 상태 확인
 sleep 3

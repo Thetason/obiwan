@@ -21,6 +21,17 @@ import struct
 app = Flask(__name__)
 CORS(app)
 
+# Optional self-test to ensure model can run a forward pass
+_SELFTEST = {"status": "unknown", "detail": None}
+if os.environ.get("DISABLE_SELFTEST", "0") != "1":
+    try:
+        # short zero audio to exercise graph
+        _ = model.signatures["serving_default"](tf.zeros([1, 16000], dtype=tf.float32))
+        _SELFTEST["status"] = "pass"
+    except Exception as e:
+        _SELFTEST["status"] = "fail"
+        _SELFTEST["detail"] = str(e)
+
 # SPICE 모델 로드
 print("SPICE 모델 로딩 중...")
 model = hub.load("https://tfhub.dev/google/spice/2")
@@ -66,11 +77,13 @@ def quantize_predictions(freqs, confs):
 @app.route('/health', methods=['GET'])
 def health():
     """서버 상태 확인"""
+    status = 'healthy' if _SELFTEST.get('status') == 'pass' else 'degraded'
     return jsonify({
-        'status': 'healthy',
+        'status': status,
         'model': 'SPICE',
         'version': '2.0',
-        'description': 'Self-supervised Pitch Estimation'
+        'description': 'Self-supervised Pitch Estimation',
+        'selftest': _SELFTEST
     })
 
 @app.route('/analyze', methods=['POST'])
@@ -199,17 +212,22 @@ def analyze():
                     'total_duration': float(len(audio) / sample_rate)
                 }
         
-        # 결과 반환
-        return jsonify({
-            'pitches': frequencies.tolist(),
-            'confidences': confidences.tolist(),
-            'quantized_pitches': quantized_freqs,
-            'notes': note_names,
+        # Dart 클라이언트 호환: legacy 키와 data 래핑 모두 제공
+        legacy = {
+            'frequencies': frequencies.tolist(),
+            'confidence': confidences.tolist(),
             'timestamps': timestamps.tolist(),
+            'notes': note_names,
+            'quantized_frequencies': quantized_freqs,
             'statistics': statistics,
             'sample_rate': 16000,
             'model': 'SPICE-v2',
             'frame_step_ms': 32
+        }
+        return jsonify({
+            'success': True,
+            'data': legacy,
+            **legacy
         })
         
     except Exception as e:

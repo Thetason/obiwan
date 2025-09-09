@@ -1,0 +1,39 @@
+version: "3.8"
+services:
+  crepe:
+    build:
+      context: .
+      dockerfile: docker/crepe.Dockerfile
+    container_name: obiwan_crepe
+    ports:
+      - "5002:5002"
+    environment:
+      - TF_CPP_MIN_LOG_LEVEL=2
+      - CREPE_CACHE_DIR=/root/.cache/crepe
+    restart: unless-stopped
+
+  spice:
+    build:
+      context: .
+      dockerfile: docker/spice.Dockerfile
+    container_name: obiwan_spice
+    ports:
+      - "5003:5003"
+    environment:
+      - TF_CPP_MIN_LOG_LEVEL=2
+      - TFHUB_CACHE_DIR=/root/.cache/tfhub
+    restart: unless-stopped
+
+  formant:
+    image: python:3.10-slim
+    container_name: obiwan_formant
+    working_dir: /app
+    volumes:
+      - .:/app:ro
+    command: bash -lc "pip install --no-cache-dir flask==3.0.3 flask-cors==4.0.1 numpy==1.26.4 librosa==0.10.2.post1 praat-parselmouth==0.4.3 scipy==1.10.1 && python formant_server.py"
+    ports:
+      - "5004:5004"
+    environment:
+      - TF_CPP_MIN_LOG_LEVEL=2
+    restart: unless-stopped
+

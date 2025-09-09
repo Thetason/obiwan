@@ -1,107 +1,98 @@
 import 'dart:math' as math;
 
+/// 정렬 포인트 (원곡 시간 -> 사용자 시간 매핑)
+class DTWAlignmentPoint {
+  final int referenceIndex;
+  final int userIndex;
+  final double referenceTime;
+  final double userTime;
+  final double distance;
+
+  DTWAlignmentPoint({
+    required this.referenceIndex,
+    required this.userIndex,
+    required this.referenceTime,
+    required this.userTime,
+    required this.distance,
+  });
+
+  double get timeDifference => (userTime - referenceTime).abs();
+}
+
+/// 음표 매칭 결과
+class DTWNoteMatching {
+  final double referenceNote;  // 원곡 음정 (Hz)
+  final double userNote;       // 사용자 음정 (Hz)
+  final double referenceTime;  // 원곡 시간
+  final double userTime;       // 사용자 시간
+  final double pitchError;     // 음정 오차 (cents)
+  final double timingError;    // 타이밍 오차 (초)
+  final bool isCorrect;        // 정확도 판정
+
+  DTWNoteMatching({
+    required this.referenceNote,
+    required this.userNote,
+    required this.referenceTime,
+    required this.userTime,
+    required this.pitchError,
+    required this.timingError,
+    required this.isCorrect,
+  });
+
+  String get pitchAccuracy {
+    final absPitchError = pitchError.abs();
+    if (absPitchError < 10) return '완벽';
+    if (absPitchError < 25) return '우수';
+    if (absPitchError < 50) return '양호';
+    if (absPitchError < 100) return '부족';
+    return '매우 부족';
+  }
+}
+
+/// DTW 정렬 결과
+class DTWAlignmentResult {
+  final List<DTWAlignmentPoint> alignmentPath;
+  final double totalDistance;
+  final double normalizedDistance;
+  final List<DTWNoteMatching> noteMatchings;
+  final double alignmentQuality;
+  final String feedback;
+
+  DTWAlignmentResult({
+    required this.alignmentPath,
+    required this.totalDistance,
+    required this.normalizedDistance,
+    required this.noteMatchings,
+    required this.alignmentQuality,
+    required this.feedback,
+  });
+
+  double get qualityPercentage => alignmentQuality * 100;
+  String get timingAccuracy {
+    if (alignmentQuality > 0.9) return '매우 정확';
+    if (alignmentQuality > 0.7) return '정확';
+    if (alignmentQuality > 0.5) return '보통';
+    if (alignmentQuality > 0.3) return '부정확';
+    return '매우 부정확';
+  }
+}
+
 /// DTW (Dynamic Time Warping) 멜로디 정렬 시스템
-/// 사용자가 부른 멜로디와 원곡을 시간적으로 정렬하여 정확한 비교 분석
-/// 
-/// 참고: DEVELOPMENT_PRINCIPLES.md - NO DUMMY DATA 원칙 준수
 class DTWMelodyAligner {
-  // DTW 매트릭스 최대 크기 (메모리 효율성)
   static const int maxSequenceLength = 5000;
-  
-  /// DTW 정렬 결과
-  class AlignmentResult {
-    final List<AlignmentPoint> alignmentPath;
-    final double totalDistance;
-    final double normalizedDistance;
-    final List<NoteMatching> noteMatchings;
-    final double alignmentQuality;
-    final String feedback;
-    
-    AlignmentResult({
-      required this.alignmentPath,
-      required this.totalDistance,
-      required this.normalizedDistance,
-      required this.noteMatchings,
-      required this.alignmentQuality,
-      required this.feedback,
-    });
-    
-    /// 정렬 품질 평가 (0-100%)
-    double get qualityPercentage => alignmentQuality * 100;
-    
-    /// 타이밍 정확도 평가
-    String get timingAccuracy {
-      if (alignmentQuality > 0.9) return '매우 정확';
-      if (alignmentQuality > 0.7) return '정확';
-      if (alignmentQuality > 0.5) return '보통';
-      if (alignmentQuality > 0.3) return '부정확';
-      return '매우 부정확';
-    }
-  }
-  
-  /// 정렬 포인트 (원곡 시간 -> 사용자 시간 매핑)
-  class AlignmentPoint {
-    final int referenceIndex;
-    final int userIndex;
-    final double referenceTime;
-    final double userTime;
-    final double distance;
-    
-    AlignmentPoint({
-      required this.referenceIndex,
-      required this.userIndex,
-      required this.referenceTime,
-      required this.userTime,
-      required this.distance,
-    });
-    
-    /// 타이밍 차이 (초)
-    double get timeDifference => (userTime - referenceTime).abs();
-  }
-  
-  /// 음표 매칭 결과
-  class NoteMatching {
-    final double referenceNote;  // 원곡 음정 (Hz)
-    final double userNote;       // 사용자 음정 (Hz)
-    final double referenceTime;  // 원곡 시간
-    final double userTime;       // 사용자 시간
-    final double pitchError;     // 음정 오차 (cents)
-    final double timingError;    // 타이밍 오차 (초)
-    final bool isCorrect;        // 정확도 판정
-    
-    NoteMatching({
-      required this.referenceNote,
-      required this.userNote,
-      required this.referenceTime,
-      required this.userTime,
-      required this.pitchError,
-      required this.timingError,
-      required this.isCorrect,
-    });
-    
-    /// 음정 정확도 평가
-    String get pitchAccuracy {
-      final absPitchError = pitchError.abs();
-      if (absPitchError < 10) return '완벽';
-      if (absPitchError < 25) return '우수';
-      if (absPitchError < 50) return '양호';
-      if (absPitchError < 100) return '부족';
-      return '매우 부족';
-    }
-  }
   
   /// 메인 DTW 정렬 함수
   /// [referencePitch]: 원곡 피치 시퀀스 (CREPE/SPICE 분석 결과)
   /// [userPitch]: 사용자 피치 시퀀스
   /// [sampleRate]: 샘플레이트 (기본 100Hz = 10ms 간격)
-  AlignmentResult alignMelody(
+  DTWAlignmentResult alignMelody(
     List<double> referencePitch,
     List<double> userPitch, {
     double sampleRate = 100.0,
     double windowConstraint = 0.1,  // Sakoe-Chiba 밴드 제약
   }) {
     if (referencePitch.isEmpty || userPitch.isEmpty) {
-      return AlignmentResult(
+      return DTWAlignmentResult(
         alignmentPath: [],
         totalDistance: double.infinity,
         normalizedDistance: double.infinity,
@@ -182,12 +173,12 @@ class DTWMelodyAligner {
     }
     
     // 최적 경로 역추적
-    final alignmentPath = <AlignmentPoint>[];
+    final alignmentPath = <DTWAlignmentPoint>[];
     int i = refLength - 1;
     int j = userLength - 1;
     
     while (i > 0 || j > 0) {
-      alignmentPath.add(AlignmentPoint(
+      alignmentPath.add(DTWAlignmentPoint(
         referenceIndex: i,
         userIndex: j,
         referenceTime: i / sampleRate,
@@ -224,7 +215,7 @@ class DTWMelodyAligner {
     }
     
     // 경로 반전 (시작부터 끝까지)
-    alignmentPath.add(AlignmentPoint(
+    alignmentPath.add(DTWAlignmentPoint(
       referenceIndex: 0,
       userIndex: 0,
       referenceTime: 0,
@@ -235,7 +226,7 @@ class DTWMelodyAligner {
     final finalPath = alignmentPath.reversed.toList();
     
     // 음표 매칭 분석
-    final noteMatchings = <NoteMatching>[];
+    final noteMatchings = <DTWNoteMatching>[];
     for (final point in finalPath) {
       if (point.referenceIndex < refLength && point.userIndex < userLength) {
         final refNote = referencePitch[point.referenceIndex];
@@ -245,7 +236,7 @@ class DTWMelodyAligner {
           final pitchError = 1200 * (math.log(userNote / refNote) / math.log(2));
           final timingError = point.timeDifference;
           
-          noteMatchings.add(NoteMatching(
+          noteMatchings.add(DTWNoteMatching(
             referenceNote: refNote,
             userNote: userNote,
             referenceTime: point.referenceTime,
@@ -271,8 +262,8 @@ class DTWMelodyAligner {
     
     // 피드백 생성
     final feedback = _generateFeedback(alignmentQuality, noteMatchings);
-    
-    return AlignmentResult(
+
+    return DTWAlignmentResult(
       alignmentPath: finalPath,
       totalDistance: totalDistance,
       normalizedDistance: normalizedDistance,
@@ -285,7 +276,7 @@ class DTWMelodyAligner {
   /// 정렬 품질 계산
   double _calculateAlignmentQuality(
     double normalizedDistance,
-    List<NoteMatching> noteMatchings,
+    List<DTWNoteMatching> noteMatchings,
   ) {
     if (noteMatchings.isEmpty) return 0.0;
     
@@ -317,7 +308,7 @@ class DTWMelodyAligner {
   /// 사용자 피드백 생성
   String _generateFeedback(
     double quality,
-    List<NoteMatching> noteMatchings,
+    List<DTWNoteMatching> noteMatchings,
   ) {
     if (noteMatchings.isEmpty) {
       return '분석할 수 있는 음정이 없습니다';
@@ -402,66 +393,48 @@ class DTWMelodyAligner {
     return segments;
   }
   
-  /// 실시간 정렬 (스트리밍 모드)
-  /// 사용자가 노래하는 동안 실시간으로 정렬
-  class RealtimeAligner {
-    final List<double> referenceMelody;
-    final List<double> userBuffer = [];
-    final int windowSize;
-    final double sampleRate;
-    
-    RealtimeAligner({
-      required this.referenceMelody,
-      this.windowSize = 500,  // 5초 윈도우 (100Hz 기준)
-      this.sampleRate = 100.0,
-    });
-    
-    /// 새로운 피치 데이터 추가
-    void addPitchData(double pitch) {
-      userBuffer.add(pitch);
-      
-      // 버퍼 크기 제한
-      if (userBuffer.length > windowSize * 2) {
-        userBuffer.removeRange(0, userBuffer.length - windowSize);
-      }
+}
+
+/// 실시간 정렬 (스트리밍 모드) - Top-level 클래스로 분리
+class DTWRealtimeAligner {
+  final List<double> referenceMelody;
+  final List<double> userBuffer = [];
+  final int windowSize;
+  final double sampleRate;
+
+  DTWRealtimeAligner({
+    required this.referenceMelody,
+    this.windowSize = 500, // 5초 윈도우 (100Hz 기준)
+    this.sampleRate = 100.0,
+  });
+
+  void addPitchData(double pitch) {
+    userBuffer.add(pitch);
+    if (userBuffer.length > windowSize * 2) {
+      userBuffer.removeRange(0, userBuffer.length - windowSize);
     }
-    
-    /// 현재까지의 정렬 결과 계산
-    AlignmentResult? getCurrentAlignment(DTWMelodyAligner aligner) {
-      if (userBuffer.length < 10) return null;
-      
-      // 현재 위치 추정
-      final currentPosition = _estimateCurrentPosition();
-      
-      // 참조 멜로디의 해당 구간 추출
-      final startIdx = math.max(0, currentPosition - windowSize ~/ 2);
-      final endIdx = math.min(
-        referenceMelody.length,
-        currentPosition + windowSize ~/ 2,
-      );
-      
-      if (endIdx <= startIdx) return null;
-      
-      final refSegment = referenceMelody.sublist(startIdx, endIdx);
-      
-      // DTW 정렬 수행
-      return aligner.alignMelody(refSegment, userBuffer);
-    }
-    
-    /// 현재 위치 추정 (간단한 휴리스틱)
-    int _estimateCurrentPosition() {
-      // 실제 구현에서는 더 정교한 추정 알고리즘 사용
-      // 예: 이전 정렬 결과 기반 추정
-      return (userBuffer.length * referenceMelody.length ~/ 
-              (windowSize * 2)).clamp(0, referenceMelody.length - 1);
-    }
+  }
+
+  DTWAlignmentResult? getCurrentAlignment(DTWMelodyAligner aligner) {
+    if (userBuffer.length < 10) return null;
+    final currentPosition = _estimateCurrentPosition();
+    final startIdx = math.max(0, currentPosition - windowSize ~/ 2);
+    final endIdx = math.min(referenceMelody.length, currentPosition + windowSize ~/ 2);
+    if (endIdx <= startIdx) return null;
+    final refSegment = referenceMelody.sublist(startIdx, endIdx);
+    return aligner.alignMelody(refSegment, userBuffer);
+  }
+
+  int _estimateCurrentPosition() {
+    return (userBuffer.length * referenceMelody.length ~/ (windowSize * 2))
+        .clamp(0, referenceMelody.length - 1);
   }
 }
 
 /// DTW 시각화를 위한 헬퍼 클래스
 class DTWVisualizationData {
   final List<List<double>> costMatrix;
-  final List<DTWMelodyAligner.AlignmentPoint> optimalPath;
+  final List<DTWAlignmentPoint> optimalPath;
   final int referenceLength;
   final int userLength;
   

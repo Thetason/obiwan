@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import '../models/analysis_result.dart';
+import '../services/melody_evaluator.dart';
+import '../widgets/dtw_alignment_visualizer.dart';
+import '../services/reference_melody_service.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
 
 // RealtimePitchGraph와 호환되는 PitchPoint 정의
 // (recording_flow_modal.dart에서 정의된 것과 동일)
@@ -22,12 +28,14 @@ class VanidoStyleTrainingScreen extends StatefulWidget {
   final DualResult? analysisResult;
   final List<DualResult>? timeBasedResults;
   final List<double> audioData;
+  final List<double>? referencePitch; // 옵션: 원곡 피치 시퀀스(Hz)
   
   const VanidoStyleTrainingScreen({
     super.key,
     this.analysisResult,
     this.timeBasedResults,
     required this.audioData,
+    this.referencePitch,
   });
 
   @override
@@ -52,6 +60,10 @@ class _VanidoStyleTrainingScreenState extends State<VanidoStyleTrainingScreen>
   int _currentViewMode = 0;
   List<String> _viewModeNames = ['Analysis', 'Harmonics', 'Spectrogram', '3D View', 'Dashboard'];
   List<AnalysisPitchPoint> _analysisPitchPoints = [];
+  MelodyEvaluationResult? _melodyEval; // DTW 평가 결과
+  bool _showDTW = false;
+  bool _loadingReference = false;
+  List<double>? _referencePitchLocal;
   
   @override
   void initState() {
@@ -116,6 +128,62 @@ class _VanidoStyleTrainingScreenState extends State<VanidoStyleTrainingScreen>
         else _grade = "C";
       }
     }
+
+    // DTW 멜로디 정렬 + 피드백 (참조 멜로디가 있을 때만)
+    final ref = widget.referencePitch ?? _referencePitchLocal;
+    if (ref != null && ref.isNotEmpty &&
+        widget.timeBasedResults != null && widget.timeBasedResults!.isNotEmpty) {
+      // 사용자 피치 시퀀스 구성
+      final user = widget.timeBasedResults!
+          .map((e) => e.frequency > 0 ? e.frequency : 0.0)
+          .toList();
+      final refPitch = ref;
+      // 프레임레이트 추정: totalFrames / durationSeconds
+      final durationSec = widget.audioData.isNotEmpty
+          ? (widget.audioData.length / 44100.0)
+          : math.max(1.0, user.length / 10.0); // fallback
+      final frameRate = user.length / durationSec;
+
+      final evaluator = MelodyEvaluator();
+      _melodyEval = evaluator.evaluate(reference: refPitch, user: user, frameRate: frameRate);
+      setState(() {});
+    }
+  }
+
+  Future<void> _pickAndAnalyzeReference() async {
+    try {
+      setState(() { _loadingReference = true; });
+      final res = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['wav'], // WAV 권장
+        withData: true,
+      );
+      if (res == null || res.files.isEmpty || res.files.first.bytes == null) {
+        setState(() { _loadingReference = false; });
+        return;
+      }
+      final Uint8List bytes = res.files.first.bytes!;
+      final service = ReferenceMelodyService();
+      final refFreqs = await service.createFromAudioBytes(bytes);
+      setState(() { _referencePitchLocal = refFreqs; _loadingReference = false; });
+      // DTW 즉시 평가
+      _analyzePerformance();
+      if (_melodyEval != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('참조 멜로디 생성 완료: 프레임 ${refFreqs.length}개')),
+        );
+      }
+    } on DioException catch (e) {
+      setState(() { _loadingReference = false; });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('CREPE 서버 연결 실패: ${e.message}')),
+      );
+    } catch (e) {
+      setState(() { _loadingReference = false; });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('참조 멜로디 생성 실패: $e')),
+      );
+    }
   }
   
   @override
@@ -128,11 +196,65 @@ class _VanidoStyleTrainingScreenState extends State<VanidoStyleTrainingScreen>
             _buildHeader(),
             _buildViewModeSelector(),
             Expanded(child: _buildCurrentView()),
+            if (_melodyEval != null) _buildDTWFeedbackCard(),
             _buildScoreCard(),
             _buildDetailedAnalysis(),
             _buildActionButtons(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDTWFeedbackCard() {
+    final e = _melodyEval!;
+    final pct = (e.overallScore * 100).toStringAsFixed(1);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.indigo.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.indigo.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.timeline, color: Colors.indigo),
+              const SizedBox(width: 8),
+              Text('DTW Alignment • $pct%', style: const TextStyle(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              TextButton(
+                onPressed: () => setState(() => _showDTW = !_showDTW),
+                child: Text(_showDTW ? 'Hide' : 'Show'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(e.summary),
+          if (e.strengths.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text('Strengths', style: TextStyle(fontWeight: FontWeight.bold)),
+            for (final s in e.strengths) Text('• $s'),
+          ],
+          if (e.improvements.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text('Improvements', style: TextStyle(fontWeight: FontWeight.bold)),
+            for (final s in e.improvements) Text('• $s'),
+          ],
+          if (_showDTW) ...[
+            const SizedBox(height: 12),
+            DTWAlignmentVisualizer(
+              alignmentResult: e.alignment,
+              referencePitch: widget.referencePitch!,
+              userPitch: widget.timeBasedResults!.map((r) => r.frequency).toList(),
+              width: MediaQuery.of(context).size.width - 32,
+              height: 240,
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -156,20 +278,15 @@ class _VanidoStyleTrainingScreenState extends State<VanidoStyleTrainingScreen>
               textAlign: TextAlign.center,
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.green, width: 1),
-            ),
-            child: const Text(
-              'ANALYZED',
-              style: TextStyle(
-                color: Colors.green,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            onPressed: _loadingReference ? null : _pickAndAnalyzeReference,
+            icon: const Icon(Icons.library_music, size: 18),
+            label: Text(_loadingReference ? '분석 중...' : '참조 멜로디 불러오기'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _loadingReference ? Colors.grey : Colors.indigo,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
           ),
         ],

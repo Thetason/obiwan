@@ -124,11 +124,24 @@ class RealTimeAudioRecorder: NSObject, AVAudioPlayerDelegate {
   func startRecording(result: @escaping FlutterResult) {
     print("🎙️ [RealTime] 녹음 시작 요청")
     
-    // 1. 마이크 권한 확인
+    // 1. 마이크 권한 확인/요청
     let status = AVCaptureDevice.authorizationStatus(for: .audio)
     print("🔐 [RealTime] 마이크 권한 상태: \(status.rawValue)")
-    
-    guard status == .authorized else {
+    if status == .notDetermined {
+      AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+        DispatchQueue.main.async {
+          guard let self = self else { return }
+          if granted {
+            print("✅ [RealTime] 마이크 권한 부여됨 - 녹음 재시도")
+            self.startRecording(result: result)
+          } else {
+            print("❌ [RealTime] 마이크 권한 거부")
+            result(FlutterError(code: "PERMISSION_DENIED", message: "Microphone permission required", details: nil))
+          }
+        }
+      }
+      return
+    } else if status != .authorized {
       print("❌ [RealTime] 마이크 권한 없음")
       result(FlutterError(code: "PERMISSION_DENIED", message: "Microphone permission required", details: nil))
       return
@@ -165,14 +178,15 @@ class RealTimeAudioRecorder: NSObject, AVAudioPlayerDelegate {
       input.removeTap(onBus: 0)
       print("🔧 [RealTime] 기존 탭 제거 완료")
       
-      // 5. 실시간 오디오 처리 탭 설치 - CRITICAL FIX
-      let bufferSize: AVAudioFrameCount = 1024  // 더 작은 버퍼로 시도
+      // 5. 실시간 오디오 처리 탭 설치
+      // macOS에서 입력 하드웨어 포맷과 다른 포맷을 강제하면 콜백이 불리지 않는 사례가 있어
+      // 최초 시도는 format=nil(네이티브 포맷)을 사용한다.
+      let bufferSize: AVAudioFrameCount = 2048
       
       print("🔧 [RealTime] 탭 설치 시도 - 버퍼: \(bufferSize)")
       print("🔧 [RealTime] 입력 포맷: \(inputFormat)")
       
-      // CRITICAL FIX: 입력 노드의 실제 포맷 사용 (명시적 포맷 지정하지 않음)
-      print("🔧 [RealTime] 입력 노드의 실제 포맷 사용")
+      print("🔧 [RealTime] 입력 노드 네이티브 포맷 탭 설치 (format=nil)")
       
       // 입력 포맷이 유효한지 다시 확인
       if inputFormat.channelCount == 0 {
@@ -181,13 +195,8 @@ class RealTimeAudioRecorder: NSObject, AVAudioPlayerDelegate {
         return
       }
       
-      // CRITICAL FIX: macOS에서는 명시적 포맷 지정이 필요
-      // 48kHz로 명시적 포맷 설정
-      let recordingFormat = AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1)!
-      print("🎤 [RealTime] 녹음 포맷 설정: 48kHz, 1채널")
-      
-      // 탭 설치 - 명시적 포맷 사용
-      input.installTap(onBus: 0, bufferSize: bufferSize, format: recordingFormat) { [weak self] (buffer, when) in
+      // 탭 설치 - 네이티브 포맷 (nil)
+      input.installTap(onBus: 0, bufferSize: bufferSize, format: nil) { [weak self] (buffer, when) in
         // 즉시 로깅 - 어떤 스레드에서든 호출되었는지 확인
         print("📥 [RealTime] *** TAP CALLBACK RECEIVED *** - frameLength: \(buffer.frameLength)")
         
@@ -265,13 +274,30 @@ class RealTimeAudioRecorder: NSObject, AVAudioPlayerDelegate {
       print("✅ [RealTime] 실시간 녹음 시작 성공!")
       print("📊 [RealTime] 녹음 상태: \(isRecording)")
       
-      // 실제 오디오 캡처 확인 (디버그용)
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+      // 실제 오디오 캡처 확인 (디버그용) 및 폴백 재시도
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
         guard let self = self else { return }
         if self.recordedSamples.isEmpty {
-          print("⚠️ [RealTime] 0.5초 후: 아직 오디오 샘플이 캡처되지 않음")
-          print("🔍 [RealTime] 엔진 상태: \(self.audioEngine?.isRunning ?? false)")
-          print("🎤 [RealTime] 탭이 설치되었지만 콜백이 호출되지 않음 - 마이크 확인 필요")
+          print("⚠️ [RealTime] 0.7초 후에도 샘플 없음 → 탭 재설치 폴백 실행")
+          if let input = self.inputNode, let engine = self.audioEngine, self.isRecording {
+            input.removeTap(onBus: 0)
+            do {
+              // 엔진 유지, 탭만 다른 포맷으로 재설치 (입력 포맷 명시)
+              let altFormat = input.outputFormat(forBus: 0)
+              print("🔁 [RealTime] 탭 재설치 (명시 포맷): \(altFormat)")
+              input.installTap(onBus: 0, bufferSize: 2048, format: altFormat) { [weak self] (buffer, when) in
+                print("📥 [RealTime] *** TAP CALLBACK RECEIVED (fallback) *** - frameLength: \(buffer.frameLength)")
+                guard let strongSelf = self, strongSelf.isRecording else { return }
+                strongSelf.processAudioBuffer(buffer: buffer)
+              }
+              if !engine.isRunning {
+                try engine.start()
+              }
+              print("✅ [RealTime] 탭 재설치 완료")
+            } catch {
+              print("❌ [RealTime] 탭 재설치 실패: \(error)")
+            }
+          }
         } else {
           print("✅ [RealTime] 오디오 캡처 중: \(self.recordedSamples.count) 샘플")
         }

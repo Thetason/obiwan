@@ -5,7 +5,7 @@ import '../services/dtw_melody_aligner.dart';
 /// DTW 정렬 결과 시각화 위젯
 /// 원곡과 사용자 멜로디의 정렬을 시각적으로 표현
 class DTWAlignmentVisualizer extends StatefulWidget {
-  final DTWMelodyAligner.AlignmentResult alignmentResult;
+  final DTWAlignmentResult alignmentResult;
   final List<double> referencePitch;
   final List<double> userPitch;
   final double width;
@@ -378,7 +378,7 @@ class _DTWAlignmentVisualizerState extends State<DTWAlignmentVisualizer>
 
 /// DTW 정렬 그리드 페인터
 class AlignmentGridPainter extends CustomPainter {
-  final DTWMelodyAligner.AlignmentResult alignmentResult;
+  final DTWAlignmentResult alignmentResult;
   final List<double> referencePitch;
   final List<double> userPitch;
   final double animationValue;
@@ -552,7 +552,7 @@ class AlignmentGridPainter extends CustomPainter {
 
 /// DTW 경로 페인터
 class AlignmentPathPainter extends CustomPainter {
-  final List<DTWMelodyAligner.AlignmentPoint> alignmentPath;
+  final List<DTWAlignmentPoint> alignmentPath;
   final int referenceLength;
   final int userLength;
   final double animationValue;

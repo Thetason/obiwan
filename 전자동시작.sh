@@ -12,15 +12,18 @@ sleep 2
 
 # 서버들 백그라운드 시작
 echo "🔧 서버들 시작 중..."
-cd /Users/seoyeongbin/crepe_setup
-source crepe_env/bin/activate
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+if [ -f "venv/bin/activate" ]; then
+  source venv/bin/activate
+fi
 
 # CREPE 서버 시작
-python official_crepe_server.py > /tmp/crepe.log 2>&1 &
+python3 crepe_server.py > /tmp/crepe.log 2>&1 &
 echo "CREPE 서버 시작됨 (PID: $!)"
 
 # SPICE 서버 시작  
-python spice_server.py > /tmp/spice.log 2>&1 &
+python3 spice_server.py > /tmp/spice.log 2>&1 &
 echo "SPICE 서버 시작됨 (PID: $!)"
 
 # 서버 준비 대기
@@ -29,17 +32,17 @@ sleep 5
 
 # Flutter 앱 시작
 echo "🎵 Flutter 앱 시작 중..."
-cd /Users/seoyeongbin/vocal_trainer_ai
+cd "$SCRIPT_DIR"
 
 # 브라우저 자동 열기
 echo "🌐 브라우저에서 자동으로 앱이 열립니다..."
 
 # Flutter 실행 (localhost로 변경)
-flutter run -d chrome --web-port=8081 --web-hostname=localhost &
+flutter run -d macos &
 
 # 잠시 후 브라우저 열기 
 sleep 3
-open http://localhost:8081
+# macOS 앱 실행이므로 브라우저 자동 열기 생략
 
 echo ""
 echo "✅ 완료! 브라우저에서 마이크 권한만 허용하세요!"

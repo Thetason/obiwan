@@ -91,7 +91,12 @@ flutter test test/domain/entities/vocal_analysis_test.dart
 3. **단계별 학습 테스트**
    - 하단 "단계별" 버튼 클릭
    - 단계별 진행 및 가이드 텍스트 확인
-   - "이전/다음" 버튼으로 단계 이동 테스트
+- "이전/다음" 버튼으로 단계 이동 테스트
+
+### 3. DTW 멜로디 정렬 피드백 (선택)
+- 원곡의 레퍼런스 피치 시퀀스(Hz)를 준비한 경우, `VanidoStyleTrainingScreen`에 전달하면 DTW 정렬 기반의 정확도/요약/개선 포인트와 시각화가 표시됩니다.
+- 사용: `VanidoStyleTrainingScreen(referencePitch: refPitches, ...)`
+- 시각화 토글 버튼으로 정렬 경로와 노트 매칭을 확인할 수 있습니다.
 
 ## 문제 해결
 
