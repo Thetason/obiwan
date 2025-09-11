@@ -332,21 +332,7 @@ def analyze_chunked():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-if __name__ == '__main__':
-    print("=" * 50)
-    print("🎵 CREPE Server - 실제 피치 분석 서버")
-    print("=" * 50)
-    print("포트: 5002")
-    print("모델: CREPE (Convolutional Neural Network)")
-    print("정확도: 최고 품질 (full capacity)")
-    print("=" * 50)
-    print("엔드포인트:")
-    print("  GET  /health          - 서버 상태")
-    print("  POST /analyze         - 피치 분석 (legacy + wrapped)")
-    print("  POST /analyze_chunked - 청크 단위 분석")
-    print("=" * 50)
-    
-    app.run(host='0.0.0.0', port=5002, debug=False, threaded=True)
+## NOTE: app.run is defined at the bottom after all routes
 
 @app.route('/analyze_v2', methods=['POST'])
 def analyze_v2():
@@ -446,3 +432,19 @@ def analyze_v2():
     except Exception as e:
         import traceback
         return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+if __name__ == '__main__':
+    print("=" * 50)
+    print("🎵 CREPE Server - 실제 피치 분석 서버")
+    print("=" * 50)
+    print("포트: 5002")
+    print("모델: CREPE (Convolutional Neural Network)")
+    print("정확도: 최고 품질 (full capacity)")
+    print("=" * 50)
+    print("엔드포인트:")
+    print("  GET  /health          - 서버 상태")
+    print("  POST /analyze         - 피치 분석 (legacy + wrapped)")
+    print("  POST /analyze_v2      - 피치 분석 (structured v2)")
+    print("  POST /analyze_chunked - 청크 단위 분석")
+    print("=" * 50)
+    app.run(host='0.0.0.0', port=5002, debug=False, threaded=True)
