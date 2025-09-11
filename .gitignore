@@ -55,4 +55,15 @@ macos/Runner/Models/*
 
 # Python caches
 **/__pycache__/
+# Python virtual environments
+venv/
+venv*/
+.venv/
+
+# Python caches
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
 
