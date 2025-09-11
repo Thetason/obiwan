@@ -98,15 +98,16 @@ def analyze():
         
         # Base64 디코딩
         audio_base64 = data.get('audio_base64', '')
-        sample_rate = data.get('sample_rate', 44100)
+        sample_rate = int(float(data.get('sample_rate', 44100)))
+        encoding = (data.get('encoding') or '').lower()
         
         if not audio_base64:
             return jsonify({'error': 'No audio data provided'}), 400
         
         # Base64 → 바이트 배열
         audio_bytes = base64.b64decode(audio_base64)
-        
-        # WAV 파일인 경우 처리
+
+        # 입력 포맷 처리
         if audio_bytes[:4] == b'RIFF':
             # WAV 헤더 파싱
             with io.BytesIO(audio_bytes) as wav_io:
@@ -132,8 +133,12 @@ def analyze():
                     
                     sample_rate = framerate
         else:
-            # Raw float32 데이터로 가정
-            audio = np.frombuffer(audio_bytes, dtype=np.float32)
+            # raw float32 (encoding 힌트) 또는 기본 float32 가정
+            if encoding == 'base64_float32':
+                audio = np.frombuffer(audio_bytes, dtype=np.float32)
+            else:
+                # 최후의 수단: float32로 시도
+                audio = np.frombuffer(audio_bytes, dtype=np.float32)
         
         # 오디오 길이 확인
         if len(audio) == 0:
@@ -341,4 +346,103 @@ if __name__ == '__main__':
     print("  POST /analyze_chunked - 청크 단위 분석")
     print("=" * 50)
     
-    app.run(host='0.0.0.0', port=5002, debug=False)
+    app.run(host='0.0.0.0', port=5002, debug=False, threaded=True)
+
+@app.route('/analyze_v2', methods=['POST'])
+def analyze_v2():
+    """
+    Schema v2 endpoint used by some clients. Returns structured fields:
+    { success, meta{sr_in,sr_proc,hop,window,engine},
+      pitch{f0,frequencies,confidence_raw,confidence_adaptive,note,octave,cents},
+      voicing{vad,hnr} }
+    """
+    try:
+        data = request.json or {}
+        audio_base64 = data.get('audio_base64', '')
+        sample_rate = int(float(data.get('sample_rate', 44100)))
+        encoding = (data.get('encoding') or '').lower()
+        if not audio_base64:
+            return jsonify({'success': False, 'error': 'No audio data provided'}), 400
+
+        audio_bytes = base64.b64decode(audio_base64)
+        if audio_bytes[:4] == b'RIFF':
+            import io, wave, struct
+            with io.BytesIO(audio_bytes) as wav_io:
+                with wave.open(wav_io, 'rb') as wav_file:
+                    n_channels = wav_file.getnchannels()
+                    sample_width = wav_file.getsampwidth()
+                    framerate = wav_file.getframerate()
+                    n_frames = wav_file.getnframes()
+                    frames = wav_file.readframes(n_frames)
+                    if sample_width == 2:
+                        audio_int16 = struct.unpack(f'{n_frames * n_channels}h', frames)
+                        audio = np.array(audio_int16, dtype=np.float32) / 32768.0
+                    else:
+                        audio = np.frombuffer(frames, dtype=np.float32)
+                    if n_channels == 2:
+                        audio = audio.reshape(-1, 2).mean(axis=1)
+                    sample_rate = framerate
+        else:
+            if encoding == 'base64_float32':
+                audio = np.frombuffer(audio_bytes, dtype=np.float32)
+            else:
+                audio = np.frombuffer(audio_bytes, dtype=np.float32)
+
+        if len(audio) == 0:
+            return jsonify({'success': False, 'error': 'Empty audio data'}), 400
+
+        if sample_rate != 16000:
+            audio = resampy.resample(audio, sample_rate, 16000)
+            sample_rate = 16000
+
+        max_val = np.max(np.abs(audio))
+        if max_val > 0:
+            audio = audio / max_val
+
+        time, frequency, confidence, _ = crepe.predict(
+            audio, sample_rate, step_size=10, model_capacity='full', viterbi=True, verbose=0
+        )
+        valid = (~np.isnan(frequency)) & (confidence > 0)
+        frequency = frequency[valid]
+        confidence = confidence[valid]
+        time = time[valid]
+
+        f0 = float(np.median(frequency)) if len(frequency) else 0.0
+        # simple note estimation
+        A4 = 440.0
+        if f0 > 0:
+            semis = 12 * np.log2(f0 / A4)
+            n = int(np.round(semis))
+            cents = float((semis - n) * 100)
+            notes = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+            note = notes[(n + 9) % 12]
+            octave = int(4 + (n + 9) // 12)
+        else:
+            cents = 0.0
+            note = ''
+            octave = 0
+
+        meta = {
+            'sr_in': int(data.get('sample_rate', 44100)),
+            'sr_proc': 16000,
+            'hop': 10,  # ms
+            'window': 1024,
+            'engine': 'CREPE-full'
+        }
+        pitch = {
+            'f0': f0,
+            'frequencies': frequency.tolist(),
+            'confidence_raw': confidence.tolist(),
+            'confidence_adaptive': confidence.tolist(),
+            'note': note,
+            'octave': octave,
+            'cents': cents,
+        }
+        voicing = {
+            'vad': float(np.mean(confidence)) if len(confidence) else 0.0,
+            'hnr': 0.0,
+        }
+        return jsonify({'success': True, 'meta': meta, 'pitch': pitch, 'voicing': voicing})
+    except Exception as e:
+        import traceback
+        return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()}), 500
