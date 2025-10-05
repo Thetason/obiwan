@@ -52,7 +52,40 @@ flutter run
 flutter run --release
 ```
 
-### 3. 웹 실행 (테스트용)
+### 3. 환경 변수 구성(AppConfig)
+
+듀얼 엔진 서비스(DualEngineService)는 환경 변수로 CREPE/SPICE 서버 URL을 받아 초기화됩니다. 개발/테스트/프로덕션별 URL을 아래와 같이 설정하세요.
+
+1. 예시 환경 파일을 복사하여 환경별 값을 입력합니다.
+
+   ```bash
+   cp .env.development.example .env.development
+   cp .env.test.example .env.test
+   cp .env.production.example .env.production
+   ```
+
+2. 각 파일에 다음 필드를 채웁니다.
+
+   | 변수 | 설명 |
+   | --- | --- |
+   | `APP_ENV` | `development`, `test`, `production` 중 하나 |
+   | `CREPE_BASE_URL` | 해당 환경의 CREPE API 기본 URL |
+   | `SPICE_BASE_URL` | 해당 환경의 SPICE API 기본 URL |
+
+   필요 시 `CREPE_URL_DEV/TEST/PROD`, `SPICE_URL_DEV/TEST/PROD` 값으로 환경별 세부 URL을 덮어쓸 수 있습니다.
+
+3. 실행 시 `start_app.sh`가 `.env.<APP_ENV>` 파일을 자동으로 읽어 `--dart-define` 인자를 설정합니다. 수동으로 실행할 경우 다음 예시를 참고하세요.
+
+   ```bash
+   flutter run \
+     --dart-define=APP_ENV=development \
+     --dart-define=CREPE_BASE_URL=http://localhost:5002 \
+     --dart-define=SPICE_BASE_URL=http://localhost:5003
+   ```
+
+환경 변수가 누락되면 앱 시작 단계에서 명확한 예외와 경고 로그가 출력됩니다.
+
+### 4. 웹 실행 (테스트용)
 
 ```bash
 # 웹 서버 시작

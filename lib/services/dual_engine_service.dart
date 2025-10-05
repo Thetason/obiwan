@@ -8,13 +8,17 @@ import 'package:flutter/foundation.dart';
 import '../models/analysis_result.dart';
 import 'single_pitch_tracker.dart';
 import 'ondevice_crepe_service.dart';
+import '../config/app_config.dart';
 import '../config/pipeline_preset.dart';
 
 /// 초고속 CREPE + SPICE 듀얼 엔진 서비스 (HTTP/2 + 배치 처리)
 class DualEngineService {
-  static const String _crepeUrl = 'http://localhost:5002';
-  static const String _spiceUrl = 'http://localhost:5003';
-  
+  static DualEngineService? _instance;
+
+  final AppConfig _config;
+  final String _crepeUrl;
+  final String _spiceUrl;
+
   late final Dio _crepeClient;
   late final Dio _spiceClient;
   
@@ -29,9 +33,22 @@ class DualEngineService {
   static const int _maxCacheSize = 10;
   
   // 싱글톤
-  static final DualEngineService _instance = DualEngineService._internal();
-  factory DualEngineService() => _instance;
-  
+  factory DualEngineService({AppConfig? config}) {
+    if (_instance != null) {
+      return _instance!;
+    }
+
+    if (config == null) {
+      throw StateError(
+        'DualEngineService must be initialized with an AppConfig before use. '
+        'Call DualEngineService(config: appConfig) during application startup.',
+      );
+    }
+
+    _instance = DualEngineService._internal(config);
+    return _instance!;
+  }
+
   // 배치 처리용 큐
   final List<BatchRequest> _crepeQueue = [];
   final List<BatchRequest> _spiceQueue = [];
@@ -40,9 +57,25 @@ class DualEngineService {
   // 연결 풀링
   final Map<String, String> _connectionPool = {};
 
-  DualEngineService._internal() {
+  DualEngineService._internal(AppConfig config)
+      : _config = config,
+        _crepeUrl = config.crepeBaseUrl ?? '',
+        _spiceUrl = config.spiceBaseUrl ?? '' {
+    _validateBaseUrls();
     _initializeClients();
     _startBatchProcessor();
+  }
+
+  void _validateBaseUrls() {
+    final missingKeys = _config.missingDualEngineKeys;
+    if (missingKeys.isNotEmpty) {
+      final message =
+          'DualEngineService base URL configuration is missing for '
+          '${_config.environment} environment. Please provide ${missingKeys.join(', ')} '
+          'using --dart-define or platform environment variables.';
+      debugPrint('⚠️ [DualEngineService] $message');
+      throw StateError(message);
+    }
   }
   
   void _initializeClients() {
