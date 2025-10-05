@@ -7,6 +7,7 @@ import 'screens/wave_start_screen.dart';
 import 'screens/pitch_test_screen.dart';
 import 'screens/vocal_app_screen.dart';
 import 'design_system/screens/vj_home_screen.dart';  // New Voice Journey import
+import 'config/app_config.dart';
 import 'core/debug_logger.dart';
 import 'core/error_handler.dart';
 import 'core/resource_manager.dart';
@@ -26,14 +27,27 @@ final bool _SAFE_MODE = _kSafeModeStr.toLowerCase() == 'true';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  final appConfig = AppConfig.load();
+  final missingConfig = appConfig.missingDualEngineKeys;
+  if (missingConfig.isNotEmpty) {
+    final message =
+        'Missing dual engine configuration: ${missingConfig.join(', ')} '
+        'for ${appConfig.environment} environment. Configure the URLs via --dart-define.';
+    debugPrint('⚠️ [MAIN] $message');
+    throw StateError(message);
+  }
+
+  final dualEngineService = DualEngineService(config: appConfig);
+
   // 🚀 오비완 v3 디버깅 시스템 초기화
   print('🚀 오비완 v3 시작 - 디버깅 시스템 초기화 중...');
-  
+
   // 디버그 로거 초기화
   await logger.initialize();
   await logger.info('=== 오비완 v3 디버깅 시스템 시작 ===', tag: 'MAIN');
-  
+  await logger.info('환경 구성: ${appConfig.environment}', tag: 'MAIN');
+
   // 🔧 고도화된 디버그 도구 초기화 (디버그 모드에서만)
   if (_isDebugModeEnabled) {
     await _initializeAdvancedDebugTools();
@@ -60,7 +74,7 @@ void main() async {
     await logger.info('리소스 매니저 모니터링 시작', tag: 'MAIN');
     // 복구 시스템 초기화
     await ResilienceManager().initialize(
-      dualEngineService: DualEngineService(),
+      dualEngineService: dualEngineService,
       nativeAudioService: NativeAudioService.instance,
     );
     await logger.info('복구 시스템 초기화 완료', tag: 'MAIN');
