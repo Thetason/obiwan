@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../services/native_audio_service.dart';
 import '../../services/dual_engine_service.dart';
 import '../../services/bach_temperament_service.dart';
+import '../../services/audio_backends/audio_backend_interface.dart';
 import '../tokens/colors.dart';
 import '../tokens/typography.dart';
 import '../tokens/spacing.dart';
@@ -47,6 +48,11 @@ class _VJRecordingFlowState extends State<VJRecordingFlow>
   List<double> _audioLevels = [];
   List<double>? _recordedAudioData;
   bool _isTestMode = false; // MP3 테스트 모드
+  AudioServiceStatus? _audioStatus;
+  String? _statusMessage;
+  String? _uploadedFileName;
+  bool _usingUploadedFile = false;
+  VoidCallback? _statusListener;
   
   // Analysis state
   List<PitchPoint> _pitchData = [];
@@ -95,8 +101,21 @@ class _VJRecordingFlowState extends State<VJRecordingFlow>
   }
 
   Future<void> _initializeAudio() async {
-    // Request microphone permissions if needed
-    // Audio service is already initialized
+    _statusListener = () {
+      if (!mounted) return;
+      setState(() {
+        _audioStatus = _audioService.status;
+        _statusMessage = _audioService.status?.message;
+      });
+    };
+    _audioService.statusNotifier.addListener(_statusListener!);
+
+    final status = await _audioService.initialize();
+    if (!mounted) return;
+    setState(() {
+      _audioStatus = status ?? _audioService.status;
+      _statusMessage = _audioStatus?.message;
+    });
   }
 
   @override
@@ -104,6 +123,9 @@ class _VJRecordingFlowState extends State<VJRecordingFlow>
     _recordingTimer?.cancel();
     _pulseController.dispose();
     _progressController.dispose();
+    if (_statusListener != null) {
+      _audioService.statusNotifier.removeListener(_statusListener!);
+    }
     super.dispose();
   }
 
@@ -118,20 +140,37 @@ class _VJRecordingFlowState extends State<VJRecordingFlow>
 
   void _startRecording() async {
     HapticFeedback.lightImpact();
-    
+
     setState(() {
       _currentStep = RecordingStep.recording;
       _isRecording = true;
       _recordingTime = 0.0;
       _audioLevels.clear();
+      _usingUploadedFile = false;
+      _uploadedFileName = null;
     });
-    
+
     _pulseController.repeat(reverse: true);
-    
+
+    if ((_audioStatus?.permissionGranted ?? true) == false) {
+      _showPermissionDialog();
+      _pulseController.stop();
+      setState(() {
+        _isRecording = false;
+        _currentStep = RecordingStep.prepare;
+      });
+      return;
+    }
+
     // Start real recording using correct method name
     final success = await _audioService.startRecording();
     if (!success) {
       print('❌ Failed to start recording');
+      _pulseController.stop();
+      setState(() {
+        _isRecording = false;
+        _currentStep = RecordingStep.prepare;
+      });
       return;
     }
     
@@ -154,7 +193,7 @@ class _VJRecordingFlowState extends State<VJRecordingFlow>
 
   void _stopRecording() async {
     HapticFeedback.mediumImpact();
-    
+
     _recordingTimer?.cancel();
     _pulseController.stop();
     
@@ -189,6 +228,102 @@ class _VJRecordingFlowState extends State<VJRecordingFlow>
         _currentStep = RecordingStep.prepare;
       });
     }
+  }
+
+  Future<void> _handleFileUpload() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['wav'],
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+
+    final file = result.files.first;
+    final bytes = file.bytes;
+
+    if (bytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('선택한 파일을 읽을 수 없습니다. (지원 형식: WAV)')),
+      );
+      return;
+    }
+
+    final capture = _parseWavBytes(bytes, file.name);
+    if (capture == null || capture.samples == null || capture.samples!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('WAV 파일에서 오디오 데이터를 추출하지 못했습니다.')),
+      );
+      return;
+    }
+
+    _audioService.registerExternalCapture(capture);
+
+    setState(() {
+      _recordedAudioData = capture.samples;
+      _uploadedFileName = file.name;
+      _usingUploadedFile = true;
+      _currentStep = RecordingStep.analyzing;
+    });
+
+    await _analyzeAudio(capture.samples!);
+  }
+
+  AudioCaptureResult? _parseWavBytes(Uint8List bytes, String fileName) {
+    if (bytes.length < 44) {
+      return null;
+    }
+
+    final header = String.fromCharCodes(bytes.sublist(0, 4));
+    if (header != 'RIFF') {
+      return null;
+    }
+
+    final sampleRate = ByteData.sublistView(bytes, 24, 28).getUint32(0, Endian.little);
+    final bitsPerSample = ByteData.sublistView(bytes, 34, 36).getUint16(0, Endian.little);
+    if (bitsPerSample != 16) {
+      return null;
+    }
+
+    final data = bytes.sublist(44);
+    final byteData = ByteData.sublistView(data);
+    final sampleCount = data.length ~/ 2;
+    final samples = List<double>.generate(sampleCount, (index) {
+      final value = byteData.getInt16(index * 2, Endian.little);
+      return value / 32768.0;
+    });
+
+    final duration = Duration(milliseconds: ((sampleCount / sampleRate) * 1000).round());
+
+    return AudioCaptureResult(
+      samples: samples,
+      sampleRate: sampleRate,
+      duration: duration,
+      filePath: fileName,
+      format: 'wav',
+    );
+  }
+
+  void _showPermissionDialog() {
+    final status = _audioStatus;
+    final message = status?.message ?? '마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.';
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('마이크 권한 필요'),
+          content: Text('$message\n\n권한을 허용할 수 없다면 파일 업로드 옵션을 사용해주세요.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _analyzeAudio(List<double> audioData) async {
@@ -368,12 +503,86 @@ class _VJRecordingFlowState extends State<VJRecordingFlow>
         centerTitle: true,
       ),
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(VJSpacing.screenPadding),
-            child: _buildContent(),
-          ),
+        child: Column(
+          children: [
+            if (_audioStatus != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildStatusBanner(),
+              ),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(VJSpacing.screenPadding),
+                  child: _buildContent(),
+                ),
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBanner() {
+    final status = _audioStatus;
+    if (status == null) {
+      return const SizedBox.shrink();
+    }
+
+    Color background;
+    IconData icon;
+    String message;
+
+    if (!status.supported) {
+      background = Colors.orange.shade100;
+      icon = Icons.upload_file;
+      message = '현재 플랫폼에서는 실시간 녹음이 지원되지 않습니다. 파일 업로드로 진행해주세요.';
+    } else if (!status.permissionGranted) {
+      background = Colors.yellow.shade100;
+      icon = Icons.lock_outline;
+      message = status.message ?? '마이크 권한이 필요합니다.';
+    } else {
+      background = Colors.green.shade100;
+      icon = Icons.mic;
+      message = status.message ?? '마이크 준비 완료';
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.black.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.black54),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
+                  style: VJTypography.bodyMedium,
+                ),
+                if (_statusMessage != null && _statusMessage != message)
+                  Text(
+                    _statusMessage!,
+                    style: VJTypography.caption.copyWith(color: Colors.black54),
+                  ),
+              ],
+            ),
+          ),
+          if (!status.supported || !status.permissionGranted)
+            VJButton.secondary(
+              label: '파일 업로드',
+              onPressed: _handleFileUpload,
+            ),
+        ],
       ),
     );
   }
@@ -476,6 +685,27 @@ class _VJRecordingFlowState extends State<VJRecordingFlow>
             ),
             textAlign: TextAlign.center,
           ),
+          if ((_audioStatus?.supported ?? true) == false ||
+              (_audioStatus?.permissionGranted ?? true) == false) ...[
+            SizedBox(height: VJSpacing.md),
+            Text(
+              '실시간 녹음이 어려운 환경에서는 WAV 파일을 업로드해서 분석할 수 있습니다.',
+              style: VJTypography.bodySmall.copyWith(color: VJColors.gray500),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: VJSpacing.sm),
+            VJButton.secondary(
+              label: 'WAV 파일 업로드',
+              onPressed: _handleFileUpload,
+            ),
+          ],
+          if (_uploadedFileName != null && _usingUploadedFile) ...[
+            SizedBox(height: VJSpacing.md),
+            Text(
+              '최근 업로드: $_uploadedFileName',
+              style: VJTypography.caption.copyWith(color: VJColors.gray500),
+            ),
+          ],
           SizedBox(height: VJSpacing.xl),
           // Test Mode Button
           TextButton.icon(
@@ -643,9 +873,18 @@ class _VJRecordingFlowState extends State<VJRecordingFlow>
               color: VJColors.gray900,
             ),
           ),
-          
+
           SizedBox(height: VJSpacing.md),
-          
+
+          if (_usingUploadedFile && _uploadedFileName != null)
+            Text(
+              '분석 대상: 업로드된 $_uploadedFileName',
+              style: VJTypography.bodyMedium.copyWith(color: VJColors.gray500),
+            ),
+
+          if (_usingUploadedFile && _uploadedFileName != null)
+            SizedBox(height: VJSpacing.sm),
+
           Text(
             'Accuracy: ${(_averageAccuracy * 100).toInt()}%',
             style: VJTypography.bodyLarge.copyWith(

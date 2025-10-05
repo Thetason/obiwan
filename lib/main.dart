@@ -67,8 +67,11 @@ void main() async {
   }
   
   // 네이티브 오디오 서비스 초기화
-  await NativeAudioService.instance.initialize();
-  await logger.info('네이티브 오디오 서비스 초기화 완료', tag: 'MAIN');
+  final audioInitStatus = await NativeAudioService.instance.initialize();
+  await logger.info(
+    '네이티브 오디오 서비스 초기화 완료: backend=${audioInitStatus?.backendName}, permission=${audioInitStatus?.permissionGranted}',
+    tag: 'MAIN',
+  );
   
   // 오디오 시스템 상태 확인
   final audioStatus = await NativeAudioService.instance.getAudioSystemStatus();

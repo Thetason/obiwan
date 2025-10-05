@@ -2,17 +2,30 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'audio_backends/audio_backend_factory.dart';
+import 'audio_backends/audio_backend_interface.dart';
 import '../core/debug_logger.dart';
 import '../core/error_handler.dart';
 
 class NativeAudioService {
   static const MethodChannel _channel = MethodChannel('audio_capture');
   static NativeAudioService? _instance;
-  
+
   StreamController<Map<String, double>>? _audioLevelController;
   Function(double)? onAudioLevelChanged;
   bool _isInitialized = false;
   bool _isDisposed = false;  // CRITICAL FIX: disposal 상태 추적
+  final AudioBackend _backend = createAudioBackend();
+  final ValueNotifier<AudioServiceStatus> statusNotifier =
+      ValueNotifier<AudioServiceStatus>(
+    const AudioServiceStatus.unsupported(
+      backendName: 'uninitialized',
+      message: '오디오 서비스가 아직 초기화되지 않았습니다.',
+    ),
+  );
+  AudioCaptureResult? _lastCaptureResult;
+  StreamSubscription<Map<String, double>>? _backendLevelSubscription;
+  double _lastRmsLevel = 0.0;
   
   NativeAudioService._();
   
@@ -28,75 +41,99 @@ class NativeAudioService {
     return _audioLevelController!.stream;
   }
   
-  Future<void> initialize() async {
-    return await errorHandler.safeExecute(
+  AudioServiceStatus? get status => statusNotifier.value;
+
+  Future<AudioServiceStatus?> initialize() async {
+    final result = await errorHandler.safeExecute<AudioServiceStatus>(
       () async {
         await logger.info('네이티브 오디오 서비스 초기화 시작', tag: 'NATIVE_AUDIO');
-        
-        // 메서드 콜 핸들러 등록
-        _channel.setMethodCallHandler((MethodCall call) async {
-          await logger.debug('Swift로부터 메서드 호출 수신: ${call.method}', tag: 'NATIVE_AUDIO');
-          return await _handleMethodCall(call);
-        });
-        
-        await logger.info('네이티브 오디오 서비스 초기화 완료', tag: 'NATIVE_AUDIO');
-        _isInitialized = true;
+
+        final initStatus = await _backend.initialize();
+        statusNotifier.value = initStatus;
+        _isInitialized = initStatus.initialized;
+
+        final permissionStatus = await _backend.requestPermissions();
+        final combinedStatus = initStatus.copyWith(
+          permissionGranted: permissionStatus.permissionGranted,
+          message: permissionStatus.message ?? initStatus.message,
+          error: permissionStatus.error ?? initStatus.error,
+        );
+        statusNotifier.value = combinedStatus;
+
+        _attachBackendAudioLevels();
+
+        await logger.info(
+          '네이티브 오디오 서비스 초기화 완료 - backend=${combinedStatus.backendName}',
+          tag: 'NATIVE_AUDIO',
+        );
+        return combinedStatus;
       },
       operationName: 'Native Audio Service Initialize',
+      tag: 'NATIVE_AUDIO',
     );
+
+    return result;
   }
   
   Future<bool> startRecording() async {
-    if (defaultTargetPlatform != TargetPlatform.macOS) {
-      await logger.warning('현재 플랫폼에서는 네이티브 오디오가 지원되지 않음', tag: 'NATIVE_AUDIO');
+    final currentStatus = status;
+    if (currentStatus != null && !currentStatus.supported) {
+      await logger.warning(
+        '현재 플랫폼에서는 네이티브 오디오가 지원되지 않음 (backend=${currentStatus.backendName})',
+        tag: 'NATIVE_AUDIO',
+      );
       return false;
     }
 
+    _lastCaptureResult = null;
     final result = await errorHandler.handleAudioError(
       () async {
-        final result = await _channel.invokeMethod<bool>('startRecording');
-        await logger.info('네이티브 오디오 녹음 시작 성공: $result', tag: 'NATIVE_AUDIO');
-        return result ?? false;
+        final started = await _backend.startRecording();
+        if (started) {
+          await logger.info('네이티브 오디오 녹음 시작 성공', tag: 'NATIVE_AUDIO');
+        }
+        return started;
       },
       'Start Recording',
     );
-    
+
     return result ?? false;
   }
-  
-  Future<bool> stopRecording() async {
-    if (defaultTargetPlatform != TargetPlatform.macOS) {
-      return false;
-    }
 
+  Future<bool> stopRecording() async {
     final result = await errorHandler.handleAudioError(
       () async {
-        final result = await _channel.invokeMethod<bool>('stopRecording');
-        await logger.info('네이티브 오디오 녹음 종료 성공: $result', tag: 'NATIVE_AUDIO');
-        return result ?? false;
+        final stopped = await _backend.stopRecording();
+        if (stopped) {
+          _lastCaptureResult = await _backend.fetchRecordedAudio();
+          await logger.info('네이티브 오디오 녹음 종료 성공', tag: 'NATIVE_AUDIO');
+        }
+        return stopped;
       },
       'Stop Recording',
     );
-    
+
     return result ?? false;
   }
-  
+
   Future<List<double>?> getRecordedAudio() async {
-    if (defaultTargetPlatform != TargetPlatform.macOS) {
-      return null;
+    if (_lastCaptureResult != null && _lastCaptureResult!.samples != null) {
+      return _lastCaptureResult!.samples;
     }
 
     return await errorHandler.handleAudioError(
       () async {
-        final result = await _channel.invokeMethod<List<dynamic>>('getRecordedAudio');
-        final audioData = result?.cast<double>();
-        
+        final capture = await _backend.fetchRecordedAudio();
+        _lastCaptureResult = capture;
+
+        final audioData = capture?.samples;
+
         if (audioData != null && audioData.isNotEmpty) {
           await logger.info('녹음된 오디오 데이터 수신 성공: ${audioData.length} 샘플', tag: 'NATIVE_AUDIO');
         } else {
           await logger.warning('녹음된 오디오 데이터가 비어있음', tag: 'NATIVE_AUDIO');
         }
-        
+
         return audioData ?? [];
       },
       'Get Recorded Audio',
@@ -112,6 +149,8 @@ class NativeAudioService {
           print('🎤 [Dart] 실시간 오디오 버퍼 수신: ${audioData.length} 샘플');
         }
         return audioData;
+      } else if (_lastCaptureResult?.samples != null) {
+        return _lastCaptureResult!.samples;
       } else {
         return null;
       }
@@ -210,58 +249,23 @@ class NativeAudioService {
     }
   }
   
-  Future<dynamic> _handleMethodCall(MethodCall call) async {
-    try {
-      print('📞 [Dart] 메서드 처리 중: ${call.method}');
-      
-      switch (call.method) {
-        case 'onAudioLevel':
-          // Map으로 전달되는 오디오 레벨 데이터 처리
-          final Map<String, dynamic> levelData = Map<String, dynamic>.from(call.arguments as Map);
-          
-          final dbLevel = (levelData['level'] as num?)?.toDouble() ?? -60.0;
-          final rms = (levelData['rms'] as num?)?.toDouble() ?? 0.0;
-          final samples = (levelData['samples'] as num?)?.toInt() ?? 0;
-          
-          print('🔊 [Dart] 실시간 오디오: ${dbLevel.toStringAsFixed(1)}dB, RMS=${rms.toStringAsFixed(3)}, 샘플=${samples}');
-          
-          // RMS 값으로 콜백 호출
-          onAudioLevelChanged?.call(rms);
-          
-          // 전체 데이터를 스트림으로 전송
-          _audioLevelController?.add({
-            'level': dbLevel,
-            'rms': rms,
-            'samples': samples.toDouble(),
-          });
-          
-          return 'success';
-        default:
-          print('⚠️ [Dart] 알 수 없는 네이티브 메서드 호출: ${call.method}');
-          return 'unknown_method';
-      }
-    } catch (e) {
-      print('❌ [Dart] 메서드 처리 실패: $e');
-      return 'error: $e';
-    }
-  }
-  
   /// 녹음된 오디오 데이터 가져오기
   Future<List<double>?> getRecordedAudioData() async {
     try {
       await logger.info('녹음된 오디오 데이터 요청', tag: 'NATIVE_AUDIO');
-      
-      // Swift에서 녹음된 오디오 데이터 가져오기 (getRecordedAudio 메서드 사용)
-      final result = await _channel.invokeMethod('getRecordedAudio');
-      
-      if (result != null) {
-        // List<dynamic>을 List<double>로 변환
-        final audioData = (result as List).map((e) => (e as num).toDouble()).toList();
-        await logger.info('오디오 데이터 수신: ${audioData.length} 샘플', tag: 'NATIVE_AUDIO');
-        return audioData;
+
+      final capture = await _backend.fetchRecordedAudio();
+      if (capture != null) {
+        registerExternalCapture(capture);
       }
-      
-      return null;
+
+      final audioData = capture?.samples ?? _lastCaptureResult?.samples;
+
+      if (audioData != null) {
+        await logger.info('오디오 데이터 수신: ${audioData.length} 샘플', tag: 'NATIVE_AUDIO');
+      }
+
+      return audioData;
     } catch (e) {
       await logger.error('오디오 데이터 가져오기 실패: $e', tag: 'NATIVE_AUDIO');
       return null;
@@ -270,44 +274,25 @@ class NativeAudioService {
   
   /// 오디오 시스템 상태 확인
   Future<Map<String, dynamic>> getAudioSystemStatus() async {
-    if (defaultTargetPlatform != TargetPlatform.macOS) {
-      return {'supported': false, 'reason': 'Platform not supported'};
-    }
-
     try {
-      await logger.debug('오디오 시스템 상태 확인 시작', tag: 'NATIVE_AUDIO');
-      
-      // 임시로 녹음 시작을 시도해서 상태 확인
-      bool canStart = false;
-      String? errorMessage;
-      
-      try {
-        canStart = await _channel.invokeMethod<bool>('startRecording') ?? false;
-        if (canStart) {
-          // 즉시 중지
-          await _channel.invokeMethod<bool>('stopRecording');
-        }
-      } on PlatformException catch (e) {
-        errorMessage = e.message;
-        await logger.error('오디오 상태 확인 중 에러: ${e.code} - ${e.message}', tag: 'NATIVE_AUDIO');
-      }
-      
-      final status = {
-        'supported': true,
-        'canRecord': canStart,
-        'error': errorMessage,
-        'platform': 'macOS',
-        'timestamp': DateTime.now().toIso8601String(),
+      final backendStatus = await _backend.describeSystem();
+      final currentStatus = status;
+      final merged = {
+        'supported': currentStatus?.supported ?? false,
+        'permissionGranted': currentStatus?.permissionGranted ?? false,
+        'backend': currentStatus?.backendName,
+        'message': currentStatus?.message,
+        'error': currentStatus?.error,
+        ...backendStatus,
       };
-      
-      await logger.info('오디오 시스템 상태: $status', tag: 'NATIVE_AUDIO');
-      return status;
-      
+      await logger.info('오디오 시스템 상태: $merged', tag: 'NATIVE_AUDIO');
+      return merged;
     } catch (e) {
       await logger.error('오디오 상태 확인 실패: $e', tag: 'NATIVE_AUDIO');
       return {
         'supported': false,
         'error': e.toString(),
+        'backend': status?.backendName,
         'timestamp': DateTime.now().toIso8601String(),
       };
     }
@@ -413,9 +398,15 @@ class NativeAudioService {
   /// 현재 오디오 레벨 가져오기
   Future<double> getCurrentAudioLevel() async {
     try {
-      final level = await _channel.invokeMethod<double>('getCurrentAudioLevel')
-          .timeout(const Duration(seconds: 2));
-      return level ?? 0.0;
+      if (defaultTargetPlatform == TargetPlatform.macOS) {
+        final level = await _channel
+            .invokeMethod<double>('getCurrentAudioLevel')
+            .timeout(const Duration(seconds: 2));
+        _lastRmsLevel = level ?? _lastRmsLevel;
+        return _lastRmsLevel;
+      }
+
+      return _lastRmsLevel;
     } on PlatformException catch (e) {
       await logger.warning('Native 오디오 레벨 가져오기 실패: ${e.code} - ${e.message}', tag: 'NATIVE_AUDIO');
       return 0.0;
@@ -432,7 +423,7 @@ class NativeAudioService {
   void dispose() {
     logger.info('Native Audio Service 정리', tag: 'NATIVE_AUDIO');
     _isDisposed = true;  // CRITICAL FIX: disposal 상태 설정
-    
+
     // 진행 중인 오디오 작업 모두 중지
     try {
       stopAudio().catchError((e) {
@@ -444,7 +435,7 @@ class NativeAudioService {
     } catch (e) {
       logger.error('dispose 중 오디오 정리 실패: $e', tag: 'NATIVE_AUDIO');
     }
-    
+
     // StreamController 안전하게 정리
     try {
       if (_audioLevelController != null && !_audioLevelController!.isClosed) {
@@ -455,9 +446,31 @@ class NativeAudioService {
     } finally {
       _audioLevelController = null;
     }
-    
+
     // 콜백 정리
     onAudioLevelChanged = null;
+    _backendLevelSubscription?.cancel();
+    _backend.dispose();
     _isInitialized = false;
+  }
+
+  void _attachBackendAudioLevels() {
+    _backendLevelSubscription?.cancel();
+    final backendStream = _backend.audioLevelStream;
+    if (backendStream != null) {
+      _backendLevelSubscription = backendStream.listen((event) {
+        final rms = event['rms'] ?? 0.0;
+        _lastRmsLevel = rms;
+        onAudioLevelChanged?.call(rms);
+        _audioLevelController?.add(event);
+      });
+    }
+  }
+
+  AudioCaptureResult? get lastCapture => _lastCaptureResult;
+
+  void registerExternalCapture(AudioCaptureResult result) {
+    _lastCaptureResult =
+        _lastCaptureResult == null ? result : _lastCaptureResult!.merge(result);
   }
 }

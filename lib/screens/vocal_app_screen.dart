@@ -7,6 +7,9 @@ import 'redesigned_song_library_screen.dart';
 import 'practice_session_screen.dart';
 import 'progress_dashboard_screen.dart';
 import 'profile_screen.dart';
+import '../services/native_audio_service.dart';
+import '../services/audio_backends/audio_backend_interface.dart';
+import '../design_system/screens/vj_recording_flow.dart';
 
 enum TabType { home, songs, practice, progress, profile }
 
@@ -22,6 +25,9 @@ class _VocalAppScreenState extends State<VocalAppScreen>
   
   TabType _activeTab = TabType.home;
   dynamic _selectedSong;
+  final NativeAudioService _audioService = NativeAudioService.instance;
+  AudioServiceStatus? _audioStatus;
+  VoidCallback? _statusListener;
   
   late AnimationController _backgroundController;
   late AnimationController _tabController;
@@ -33,17 +39,29 @@ class _VocalAppScreenState extends State<VocalAppScreen>
       duration: const Duration(seconds: 8),
       vsync: this,
     )..repeat(reverse: true);
-    
+
     _tabController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+
+    _audioStatus = _audioService.status;
+    _statusListener = () {
+      if (!mounted) return;
+      setState(() {
+        _audioStatus = _audioService.status;
+      });
+    };
+    _audioService.statusNotifier.addListener(_statusListener!);
   }
   
   @override
   void dispose() {
     _backgroundController.dispose();
     _tabController.dispose();
+    if (_statusListener != null) {
+      _audioService.statusNotifier.removeListener(_statusListener!);
+    }
     super.dispose();
   }
   
@@ -103,7 +121,7 @@ class _VocalAppScreenState extends State<VocalAppScreen>
         children: [
           // Animated Background - 피그마 디자인 그대로
           AnimatedBackground(controller: _backgroundController),
-          
+
           // Main Content
           Column(
             children: [
@@ -114,16 +132,24 @@ class _VocalAppScreenState extends State<VocalAppScreen>
                   child: _renderContent(),
                 ),
               ),
-              
+
               // Enhanced Bottom Navigation - 피그마 스타일
               _buildBottomNavigation(),
             ],
           ),
+
+          if (_shouldShowAudioBanner)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 96,
+              child: _buildAudioSupportBanner(),
+            ),
         ],
       ),
     );
   }
-  
+
   Widget _buildBottomNavigation() {
     final tabs = [
       {'id': TabType.home, 'label': '홈', 'icon': Icons.home},
@@ -260,6 +286,163 @@ class _VocalAppScreenState extends State<VocalAppScreen>
           ),
         ),
       ),
+    );
+  }
+
+  bool get _shouldShowAudioBanner {
+    final status = _audioStatus;
+    if (status == null) return false;
+    if (!status.supported) return true;
+    if (!status.permissionGranted) return true;
+    return false;
+  }
+
+  Widget _buildAudioSupportBanner() {
+    final status = _audioStatus;
+    if (status == null) {
+      return const SizedBox.shrink();
+    }
+
+    IconData icon;
+    String title;
+    String description;
+
+    if (!status.supported) {
+      icon = Icons.computer;
+      title = '현재 디바이스에서는 실시간 마이크 캡처가 제한됩니다.';
+      description = '녹음 플로우에서 "WAV 파일 업로드" 옵션을 사용해 기존 파일로 분석을 진행해주세요.';
+    } else {
+      icon = Icons.mic_off;
+      title = '마이크 권한이 비활성화되어 있습니다.';
+      description = '설정에서 마이크 권한을 허용하거나, 권한 허용이 어려운 경우 WAV 파일 업로드 플로우로 전환할 수 있습니다.';
+    }
+
+    return Material(
+      elevation: 6,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: Colors.redAccent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ) ??
+                        const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.black54,
+                        ) ??
+                        const TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _showAudioSupportSheet,
+                        icon: const Icon(Icons.help_outline),
+                        label: const Text('도움말 보기'),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const VJRecordingFlow(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.library_music),
+                        label: const Text('업로드 플로우'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAudioSupportSheet() {
+    final status = _audioStatus;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: 24 + MediaQuery.of(context).padding.bottom,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.mic, color: Colors.deepPurple),
+                    const SizedBox(width: 12),
+                    Text(
+                      '마이크 권한 & 대체 플로우 가이드',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (status != null && !status.permissionGranted)
+                  Text(
+                    '1. 설정 > 앱 > 오비완 > 권한 > 마이크 허용 (Android)\n   설정 > 개인정보 보호 > 마이크 > 오비완 허용 (iOS)',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                const SizedBox(height: 12),
+                Text(
+                  '2. 웹 브라우저에서는 주소창의 잠금 아이콘을 눌러 마이크를 허용해주세요. Safari는 페이지 재로드가 필요할 수 있습니다.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '3. 권한 허용이 불가하거나 실시간 녹음이 지원되지 않는 환경에서는 WAV 파일을 업로드하여 분석을 진행할 수 있습니다.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const VJRecordingFlow(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('WAV 업로드 플로우 열기'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
